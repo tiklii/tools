@@ -1,4 +1,4 @@
-# Some tools I use for
+# Some tools
 
 ### text-splitter
 Splits text. Accepts txt and epub file formats. I use it to feed text into chatgpt for translation.
