@@ -11,6 +11,9 @@ Many chinese wn websites have a download feature that provides chapters in a big
 https://tiklii.github.io/text-splitter/txt2epub.html
 
 ### General purpose chapter downloader (userscript)
+
+https://gist.github.com/tiklii/715c82d5dd06d701b4773c9eea65d4c5
+
 Kinda works. Bare bones. I made this for websites that don't work with WebToEpub. Features/Peculiarities:
 - Bring your own chapter urls
 - fill chapter content selectors
