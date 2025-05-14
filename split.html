@@ -131,7 +131,7 @@
 
   <div class="input-container">
     <label for="maxChars">Max characters per chunk:</label>
-    <input type="number" id="maxChars" value="1400">
+    <input type="number" id="maxChars" value="1800">
   </div>
 
   <div class="input-container">
@@ -190,7 +190,7 @@
       const addToBottomInput = document.getElementById('addToBottom');
       const formatSelect = document.getElementById('formatSelect');
 
-      maxCharsInput.value = localStorage.getItem('maxChars') || '1400';
+      maxCharsInput.value = localStorage.getItem('maxChars') || '1800';
       const addToTopDefault = 'Translate to English (part $X of $Y):';
       addToTopInput.value = localStorage.getItem('addToTop') || addToTopDefault;
       const addToBottomDefault = '';
