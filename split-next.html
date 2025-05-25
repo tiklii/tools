@@ -7,21 +7,19 @@
   <title>EPUB Text Chunker</title>
   <script src="./script/jszip.min.js"></script>
   <script src="./script/epub.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
-
     body {
-      font-family: 'Roboto', sans-serif;
+      font-family: 'Inter', sans-serif;
       margin: 0;
-      padding: 20px;
+      padding: 30px;
       background-color: #f4f7f6;
       color: #333;
     }
 
     h1 {
+      color: #1a202c;
       text-align: center;
-      color: #007BFF;
       margin-bottom: 30px;
     }
 
@@ -31,127 +29,119 @@
       background-color: #fff;
       padding: 30px;
       border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
 
-    .input-group {
+    .form-group {
       margin-bottom: 20px;
-      display: flex;
-      flex-direction: column;
     }
 
-    .input-group label {
+    .form-group label {
       display: block;
       margin-bottom: 8px;
-      font-weight: bold;
-      color: #555;
+      font-weight: 500;
     }
 
     input[type="file"],
     input[type="number"],
     select,
     textarea {
-      padding: 10px 12px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 15px;
+      display: block;
       width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      font-size: 14px;
       box-sizing: border-box;
-      font-family: 'Roboto', sans-serif;
+      font-family: 'Inter', sans-serif;
     }
 
     textarea {
-      min-height: 100px;
+      min-height: 150px;
       resize: vertical;
+      overflow-y: auto;
     }
 
     #tocContainer {
       margin-bottom: 20px;
-      max-height: 250px;
+      max-height: 200px;
       overflow-y: auto;
-      border: 1px solid #ccc;
+      border: 1px solid #cbd5e0;
       padding: 10px;
       border-radius: 4px;
-      background-color: #f9f9f9;
+      background-color: #edf2f7;
     }
 
     #tocContainer label {
-      font-weight: bold;
-      display: block;
+      font-weight: 500;
       margin-bottom: 10px;
+      display: block;
+      color: #2d3748;
     }
 
-    #tocList {
-      list-style: none;
-      padding-left: 0;
-    }
-
-    #tocList ul {
+    #tocContainer ul {
       padding-left: 20px;
-      list-style-type: circle;
+      list-style: none;
     }
 
-    #tocList li {
+    #tocContainer ul ul {
+      list-style-type: circle;
+      padding-left: 15px;
+    }
+
+    #tocContainer li {
       cursor: pointer;
-      margin-bottom: 6px;
-      padding: 4px 8px;
-      border-radius: 4px;
+      margin-bottom: 5px;
+      padding: 4px 0;
       transition: background-color 0.2s ease;
     }
 
-    #tocList li:hover {
-      background-color: #e9ecef;
+    #tocContainer li:hover {
+      background-color: #e2e8f0;
     }
 
-    #tocList li.selected {
-      background-color: #007BFF;
+    #tocContainer li.selected {
+      background-color: #4299e1;
       color: white;
+      border-radius: 4px;
+      padding: 4px 8px;
     }
 
     #charCount {
-      font-size: 13px;
-      color: #555;
+      font-size: 12px;
+      color: #718096;
       text-align: right;
       margin-top: 5px;
     }
 
-    .button-group {
-      text-align: center;
-      margin-top: 30px;
-    }
-
-    .button {
+    button {
       padding: 12px 25px;
-      background-color: #28a745;
+      background-color: #48bb78;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 17px;
-      transition: background-color 0.2s ease, transform 0.1s ease;
+      font-size: 16px;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
     }
 
-    .button:hover {
-      background-color: #218838;
+    button:hover {
+      background-color: #38a169;
     }
-
-    .button:active {
-      transform: scale(0.98);
-    }
-
 
     #chunkedTextContainer {
-      margin-top: 40px;
-      border-top: 1px solid #eee;
+      margin-top: 30px;
       padding-top: 20px;
+      border-top: 1px solid #cbd5e0;
     }
 
     .chunk-container {
-      margin-bottom: 25px;
+      margin-bottom: 20px;
       padding: 15px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      background-color: #fcfcfc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      background-color: #f7fafc;
     }
 
     .chunk-header {
@@ -162,14 +152,13 @@
     }
 
     .chunk-title {
-      font-weight: bold;
-      font-size: 16px;
-      color: #0056b3;
+      font-weight: 600;
+      color: #2d3748;
     }
 
     .copy-button {
       padding: 6px 12px;
-      background-color: #007BFF;
+      background-color: #4299e1;
       color: white;
       border: none;
       border-radius: 4px;
@@ -181,34 +170,36 @@
     }
 
     .copy-button:hover {
-      background-color: #0056b3;
+      background-color: #3182ce;
     }
 
     .copy-button.green {
-      background-color: #28a745;
+      background-color: #48bb78;
     }
 
     .copy-button .tick {
       display: none;
       margin-left: 5px;
-      font-size: 16px;
+      font-size: 14px;
     }
 
     .copy-button.green .tick {
       display: inline-block;
     }
 
-    .chunk-textarea {
+    .chunk-text textarea {
       width: 100%;
-      height: 120px;
+      height: 150px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
       padding: 10px;
       font-size: 14px;
-      line-height: 1.6;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+      line-height: 1.5;
       resize: vertical;
       overflow-y: auto;
+      box-sizing: border-box;
       background-color: #fff;
+      color: #2d3748;
     }
 
     #loadingIndicator {
@@ -223,14 +214,8 @@
       justify-content: center;
       align-items: center;
       z-index: 1000;
-    }
-
-    #loadingIndicator p {
-      padding: 20px 30px;
-      background-color: #333;
-      color: white;
-      border-radius: 5px;
       font-size: 18px;
+      color: #2d3748;
     }
   </style>
 </head>
@@ -238,28 +223,29 @@
 <body>
   <div class="container">
     <h1>EPUB Text Chunker</h1>
-    <div class="input-group">
+    <div class="form-group">
       <label for="epubInput">Select an EPUB or txt file:</label>
       <input type="file" id="epubInput" accept=".epub, .txt">
     </div>
 
-    <div id="tocContainer">
+    <div id="tocContainer" class="form-group">
       <label>Table of Contents:</label>
       <ul id="tocList"></ul>
     </div>
 
-    <div class="input-group">
-      <label for="chapterContent">Text Content:</label>
+    <div class="form-group">
+      <label for="chapterContent">Chapter Content / Paste Text:</label>
       <textarea id="chapterContent" placeholder="Paste text or load from file..."></textarea>
       <div id="charCount">Total characters: 0</div>
     </div>
 
-    <div class="input-group">
+
+    <div class="form-group">
       <label for="maxChars">Max characters per chunk:</label>
       <input type="number" id="maxChars" value="1800">
     </div>
 
-    <div class="input-group">
+    <div class="form-group">
       <label for="formatSelect">Format text:</label>
       <select id="formatSelect">
         <option value="as-is">Show text as is</option>
@@ -267,28 +253,25 @@
       </select>
     </div>
 
-    <div class="input-group">
+    <div class="form-group">
       <label for="addToTop">Add to top of each chunk:</label>
       <textarea id="addToTop"
         placeholder="Text to add to the top of each chunk (use $X for part number, $Y for total parts)..."></textarea>
     </div>
 
-    <div class="input-group">
+    <div class="form-group">
       <label for="addToBottom">Add to bottom of each chunk:</label>
       <textarea id="addToBottom"
         placeholder="Text to add to the bottom of each chunk (use $X for part number, $Y for total parts)..."></textarea>
     </div>
 
-    <div class="button-group">
-      <button class="button" onclick="chunkText()">Split Text</button>
-    </div>
+    <button onclick="chunkText()">Split Text</button>
 
     <div id="chunkedTextContainer"></div>
   </div>
 
-  <div id="loadingIndicator">
-    <p>Loading...</p>
-  </div>
+
+  <div id="loadingIndicator">Loading...</div>
 
   <script>
     let book;
@@ -447,18 +430,14 @@
       let currentChunk = "";
 
       for (const paragraph of paragraphs) {
-        // Check if adding the paragraph plus newline would exceed the max characters
         if ((currentChunk.length + paragraph.length + 2) <= maxChars) { // +2 for newline
           currentChunk += paragraph + '\n';
         } else {
-          // Push the current chunk (trimmed to remove trailing newline from loop)
           chunks.push(currentChunk.trim());
-          // Start a new chunk with the current paragraph plus a newline
           currentChunk = paragraph + '\n';
         }
       }
 
-      // Push the last chunk if it's not empty
       if (currentChunk.trim()) {
         chunks.push(currentChunk.trim());
       }
@@ -485,22 +464,25 @@
 
         const copyButton = document.createElement('button');
         copyButton.classList.add('copy-button');
-        copyButton.innerHTML = '<i class="fas fa-copy"></i> Copy <span class="tick"><i class="fas fa-check"></i></span>';
+        copyButton.innerHTML = 'Copy<span class="tick">✔️</span>';
         copyButton.addEventListener('click', function () {
-          copyToClipboard(chunkTextarea.value);
+          copyToClipboard(finalChunk);
           updateButtonState(copyButton);
         });
 
-        chunkHeader.appendChild(chunkTitle);
-        chunkHeader.appendChild(copyButton);
+        const chunkTextareaContainer = document.createElement('div');
+        chunkTextareaContainer.classList.add('chunk-text');
 
         const chunkTextarea = document.createElement('textarea');
-        chunkTextarea.classList.add('chunk-textarea');
         chunkTextarea.value = finalChunk;
         chunkTextarea.readOnly = true;
 
+
+        chunkHeader.appendChild(chunkTitle);
+        chunkHeader.appendChild(copyButton);
+        chunkTextareaContainer.appendChild(chunkTextarea);
         chunkContainer.appendChild(chunkHeader);
-        chunkContainer.appendChild(chunkTextarea);
+        chunkContainer.appendChild(chunkTextareaContainer);
         chunkedTextContainer.appendChild(chunkContainer);
       });
     }
