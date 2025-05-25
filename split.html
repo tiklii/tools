@@ -45,7 +45,7 @@
     textarea {
       width: calc(100% - 20px);
       height: 150px;
-      margin-bottom: 20px;
+      /* margin-bottom: 20px; */ /* Adjusted for char counter */
       padding: 10px;
       font-size: 14px;
       line-height: 1.5;
@@ -53,6 +53,14 @@
       overflow-y: scroll;
       border: 1px solid #ccc;
       border-radius: 4px;
+    }
+
+    #charCount {
+      font-size: 12px;
+      color: #555;
+      text-align: right;
+      margin-bottom: 20px;
+      margin-right: 20px;
     }
 
     .input-container {
@@ -128,6 +136,7 @@
   </div>
 
   <textarea id="chapterContent" placeholder="Paste text..."></textarea>
+  <div id="charCount">Total characters: 0</div>
 
   <div class="input-container">
     <label for="maxChars">Max characters per chunk:</label>
@@ -184,11 +193,17 @@
       lastClickedButton = button;
     }
 
+    function updateCharCount() {
+      const text = document.getElementById('chapterContent').value;
+      document.getElementById('charCount').textContent = `Total characters: ${text.length}`;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       const maxCharsInput = document.getElementById('maxChars');
       const addToTopInput = document.getElementById('addToTop');
       const addToBottomInput = document.getElementById('addToBottom');
       const formatSelect = document.getElementById('formatSelect');
+      const chapterContentTextArea = document.getElementById('chapterContent');
 
       maxCharsInput.value = localStorage.getItem('maxChars') || '1800';
       const addToTopDefault = 'Translate to English (part $X of $Y):';
@@ -196,12 +211,11 @@
       const addToBottomDefault = '';
       addToBottomInput.value = localStorage.getItem('addToBottom') || addToBottomDefault;
 
-      // Load the selected value from localStorage
       const savedFormat = localStorage.getItem('formatSelect');
       if (savedFormat) {
         formatSelect.value = savedFormat;
       } else {
-        formatSelect.value = 'pretty'; // Default to 'pretty' if nothing is saved
+        formatSelect.value = 'pretty';
       }
 
       maxCharsInput.addEventListener('input', () => {
@@ -218,11 +232,14 @@
 
       formatSelect.addEventListener('change', () => {
         localStorage.setItem('formatSelect', formatSelect.value);
-        formatText(); // Apply formatting immediately
+        formatText();
       });
+      
+      chapterContentTextArea.addEventListener('input', updateCharCount);
 
-      // Initial format on load
+      // Initial format and char count on load
       formatText();
+      updateCharCount(); 
     });
 
     document.getElementById('epubInput').addEventListener('change', async function (event) {
@@ -256,9 +273,10 @@
         } else if (fileName.endsWith('.txt')) {
           const reader = new FileReader();
           reader.onload = function (e) {
-            originalText = e.target.result; // Store the original text
+            originalText = e.target.result;
             document.getElementById('chapterContent').value = originalText;
-            formatText(); // Apply formatting immediately
+            formatText();
+            updateCharCount();
           }
           reader.readAsText(file);
         } else {
@@ -281,9 +299,10 @@
       showLoading();
       try {
         const chapter = await book.load(selectedHref);
-        originalText = extractText(chapter); // Store the original text
+        originalText = extractText(chapter);
         document.getElementById('chapterContent').value = originalText;
-        formatText(); // Apply formatting immediately
+        formatText();
+        updateCharCount();
       } catch (error) {
         console.error("Error loading chapter:", error);
         alert("Failed to load chapter. See console for details.");
@@ -307,7 +326,7 @@
       let currentChunk = "";
 
       for (const paragraph of paragraphs) {
-        if ((currentChunk.length + paragraph.length + 2) <= maxChars) {
+        if ((currentChunk.length + paragraph.length + 2) <= maxChars) { // +2 for newline
           currentChunk += paragraph + '\n';
         } else {
           chunks.push(currentChunk.trim());
@@ -373,20 +392,23 @@
       const formatSelect = document.getElementById('formatSelect');
       const textArea = document.getElementById('chapterContent');
 
-      if (!originalText) {
-        originalText = textArea.value; // Store the original if it's not already stored
+      if (originalText === null && textArea.value) { // If originalText is null but textarea has content (e.g. pasted)
+        originalText = textArea.value;
       }
-
-      if (formatSelect.value === 'pretty') {
+      
+      if (formatSelect.value === 'pretty' && originalText) {
         const paragraphs = originalText.split('\n');
         const formattedText = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
         textArea.value = formattedText;
-      } else {
-        textArea.value = originalText; // Show as is
+      } else if (originalText) { // "as-is" or originalText is not yet set but we have it
+        textArea.value = originalText;
       }
+      // If originalText is null and textarea is empty, do nothing.
+      updateCharCount(); // Update char count after formatting
     }
   </script>
 </body>
 
 </html>
+
 
