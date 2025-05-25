@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+    <html lang="en">
+
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>EPUB Text Chunker Pro</title>
+      <script src="./script/jszip.min.js"></script>
+      <script src="./script/epub.min.js"></script>
+      <style>
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+          margin: 0;
+          padding: 20px;
+          background-color: #f4f7f9;
+          color: #333;
+          line-height: 1.6;
+        }
+
+        .container {
+          max-width: 900px;
+          margin: 0 auto;
+          background-color: #fff;
+          padding: 25px;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+          color: #2c3e50;
+          text-align: center;
+          margin-bottom: 25px;
+        }
+
+        label {
+          display: block;
+          font-weight: bold;
+          margin-bottom: 8px;
+          color: #555;
+        }
+
+        input[type="file"],
+        input[type="number"],
+        select,
+        textarea {
+          width: calc(100% - 22px); /* Account for padding and border */
+          padding: 10px;
+          margin-bottom: 20px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 14px;
+          box-sizing: border-box;
+        }
+        
+        input[type="file"] {
+            padding: 8px;
+        }
+
+        textarea {
+          min-height: 100px;
+          resize: vertical;
+        }
+
+        #chapterContentContainer {
+            position: relative;
+        }
+
+        #charCounter {
+            font-size: 0.85em;
+            color: #777;
+            text-align: right;
+            margin-top: -15px;
+            margin-bottom: 20px;
+        }
+
+        .button, button {
+          padding: 10px 18px;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 15px;
+          transition: background-color 0.2s ease;
+          margin-right: 10px;
+        }
+
+        .button-primary {
+          background-color: #3498db;
+        }
+        .button-primary:hover {
+          background-color: #2980b9;
+        }
+
+        .button-secondary {
+          background-color: #e74c3c;
+        }
+        .button-secondary:hover {
+          background-color: #c0392b;
+        }
+        
+        .button-tertiary {
+            background-color: #f39c12;
+        }
+        .button-tertiary:hover {
+            background-color: #e67e22;
+        }
+
+
+        #tocContainer {
+          margin-bottom: 20px;
+          max-height: 250px;
+          overflow-y: auto;
+          border: 1px solid #ddd;
+          padding: 15px;
+          border-radius: 4px;
+          background-color: #fdfdfd;
+        }
+
+        #tocContainer ul {
+          padding-left: 20px;
+          list-style-type: none;
+        }
+        
+        #tocContainer ul ul {
+          padding-left: 15px;
+        }
+
+        #tocContainer li {
+          cursor: pointer;
+          margin-bottom: 6px;
+          padding: 4px 8px;
+          border-radius: 3px;
+          transition: background-color 0.2s ease;
+        }
+
+        #tocContainer li:hover {
+          background-color: #ecf0f1;
+        }
+
+        #tocContainer li.selected {
+          background-color: #3498db;
+          color: white;
+        }
+
+        .chunk-container {
+          margin-bottom: 25px;
+          padding: 15px;
+          border: 1px solid #e0e0e0;
+          border-radius: 6px;
+          background-color: #f9f9f9;
+        }
+
+        .chunk-title {
+          font-weight: bold;
+          margin-bottom: 10px;
+          font-size: 1.1em;
+          color: #34495e;
+        }
+        
+        .chunk-textarea {
+            width: calc(100% - 22px);
+            min-height: 120px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .copy-button {
+          padding: 6px 12px;
+          background-color: #2ecc71;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          display: inline-flex; /* Changed from flex */
+          align-items: center;
+          font-size: 13px;
+        }
+        .copy-button:hover {
+            background-color: #27ae60;
+        }
+
+        .copy-button .tick {
+          display: none;
+          margin-left: 8px;
+          font-size: 16px;
+        }
+
+        .copy-button.green {
+          background-color: #27ae60; /* Keep green for copied state */
+        }
+
+        .copy-button.green .tick {
+          display: inline-block;
+        }
+
+        #loadingIndicator {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(255, 255, 255, 0.8);
+          color: #333;
+          text-align: center;
+          font-size: 1.2em;
+          z-index: 1000;
+        }
+        #loadingIndicator::before {
+            content: "Loading...";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .button-group {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px; /* Spacing between buttons */
+        }
+
+        @media (max-width: 600px) {
+          body {
+            padding: 10px;
+          }
+          .container {
+            padding: 15px;
+          }
+          .button-group {
+            flex-direction: column;
+          }
+          .button, button {
+            width: 100%;
+            margin-bottom: 10px;
+          }
+        }
+      </style>
+    </head>
+
+    <body>
+      <div class="container">
+        <h1>EPUB Text Chunker Pro</h1>
+        
+        <div class="input-group">
+          <label for="epubInput">Select an EPUB or TXT file:</label>
+          <input type="file" id="epubInput" accept=".epub, .txt">
+        </div>
+
+        <div class="button-group">
+            <button id="clearStoredEpub" class="button button-secondary">Clear Stored EPUB</button>
+            <button id="clearTextarea" class="button button-tertiary">Clear Current Text</button>
+        </div>
+
+        <div id="tocContainer" style="display: none;">
+          <label>Table of Contents:</label>
+          <ul id="tocList"></ul>
+        </div>
+        
+        <div id="chapterContentContainer">
+            <label for="chapterContent">Text Content (Preview & Edit):</label>
+            <textarea id="chapterContent" placeholder="EPUB/TXT content will appear here, or paste text..."></textarea>
+            <div id="charCounter">Characters: 0</div>
+        </div>
+
+        <div class="input-group">
+          <label for="maxChars">Max characters per chunk:</label>
+          <input type="number" id="maxChars" value="1800">
+        </div>
+
+        <div class="input-group">
+          <label for="formatSelect">Format text:</label>
+          <select id="formatSelect">
+            <option value="as-is">Show text as is</option>
+            <option value="pretty">Pretty (remove extra lines)</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="addToTop">Add to top of each chunk:</label>
+          <textarea id="addToTop" placeholder="Use $X for part number, $Y for total parts..."></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="addToBottom">Add to bottom of each chunk:</label>
+          <textarea id="addToBottom" placeholder="Use $X for part number, $Y for total parts..."></textarea>
+        </div>
+
+        <button onclick="chunkText()" class="button button-primary" style="width: 100%; margin-bottom: 20px;">Split Text into Chunks</button>
+
+        <div id="chunkedTextContainer"></div>
+      </div>
+
+      <div id="loadingIndicator"></div>
+
+      <script>
+        let book;
+        let lastClickedCopyButton = null;
+        let originalText = ""; // Store the original unformatted text from textarea or file
+
+        const DB_NAME = 'EpubChunkerDB';
+        const STORE_NAME = 'epubFiles';
+        const CURRENT_EPUB_KEY = 'currentEpub';
+        let db;
+
+        function showLoading(message = "Loading...") {
+          const indicator = document.getElementById('loadingIndicator');
+          indicator.innerHTML = message; // Use innerHTML to allow simple text or HTML
+          indicator.style.display = 'flex'; // Use flex to center content if needed
+          indicator.style.alignItems = 'center';
+          indicator.style.justifyContent = 'center';
+        }
+
+        function hideLoading() {
+          document.getElementById('loadingIndicator').style.display = 'none';
+        }
+
+        function updateButtonState(button) {
+          if (lastClickedCopyButton && lastClickedCopyButton !== button) {
+            lastClickedCopyButton.classList.remove('green');
+            lastClickedCopyButton.querySelector('.tick').style.display = 'none';
+            lastClickedCopyButton.childNodes[0].nodeValue = "Copy to Clipboard";
+          }
+
+          button.classList.add('green');
+          button.querySelector('.tick').style.display = 'inline-block';
+          button.childNodes[0].nodeValue = "Copied "; // Text before the tick
+          lastClickedCopyButton = button;
+        }
+        
+        function updateCharCounter() {
+            const text = document.getElementById('chapterContent').value;
+            document.getElementById('charCounter').textContent = `Characters: ${text.length}`;
+        }
+
+        // --- IndexedDB Functions ---
+        async function initDB() {
+          return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, 1);
+            request.onerror = (event) => {
+              console.error("IndexedDB error:", event.target.error);
+              reject("Error opening DB");
+            };
+            request.onsuccess = (event) => {
+              db = event.target.result;
+              resolve(db);
+            };
+            request.onupgradeneeded = (event) => {
+              const dbInstance = event.target.result;
+              if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
+                dbInstance.createObjectStore(STORE_NAME); // No keyPath, we use explicit keys
+              }
+            };
+          });
+        }
+
+        async function saveEpubToDB(file) {
+          if (!db || !(file instanceof Blob)) return; // Ensure file is a Blob or File
+          showLoading("Saving EPUB to local storage...");
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const fileData = {
+              name: file.name,
+              type: file.type,
+              data: arrayBuffer,
+              timestamp: new Date().getTime()
+            };
+            const request = store.put(fileData, CURRENT_EPUB_KEY);
+            
+            return new Promise((resolve, reject) => {
+              request.onsuccess = () => {
+                console.log('EPUB saved to IndexedDB');
+                hideLoading();
+                resolve();
+              };
+              request.onerror = (event) => {
+                console.error('Error saving EPUB to IndexedDB:', event.target.error);
+                hideLoading();
+                alert('Failed to save EPUB locally. It might be too large or an issue with browser storage.');
+                reject(event.target.error);
+              };
+            });
+          } catch (error) {
+            console.error('Error reading file for DB storage:', error);
+            hideLoading();
+            alert('Error preparing EPUB for local storage.');
+          }
+        }
+
+        async function loadEpubFromDB() {
+          if (!db) return;
+          showLoading("Checking for stored EPUB...");
+          const transaction = db.transaction([STORE_NAME], 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.get(CURRENT_EPUB_KEY);
+
+          return new Promise((resolve, reject) => {
+            request.onsuccess = (event) => {
+              const storedFile = event.target.result;
+              if (storedFile && storedFile.data) {
+                console.log('EPUB loaded from IndexedDB:', storedFile.name);
+                const file = new File([storedFile.data], storedFile.name, { type: storedFile.type });
+                handleFileProcessing(file); // Process the file as if it was just selected
+                hideLoading();
+                resolve(file);
+              } else {
+                console.log('No EPUB found in IndexedDB.');
+                hideLoading();
+                resolve(null);
+              }
+            };
+            request.onerror = (event) => {
+              console.error('Error loading EPUB from IndexedDB:', event.target.error);
+              hideLoading();
+              reject(event.target.error);
+            };
+          });
+        }
+
+        async function clearEpubFromDB() {
+          if (!db) return;
+          showLoading("Clearing stored EPUB...");
+          const transaction = db.transaction([STORE_NAME], 'readwrite');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.delete(CURRENT_EPUB_KEY);
+
+          return new Promise((resolve, reject) => {
+            request.onsuccess = () => {
+              console.log('Stored EPUB cleared from IndexedDB.');
+              document.getElementById('epubInput').value = ''; // Reset file input
+              document.getElementById('tocList').innerHTML = '';
+              document.getElementById('tocContainer').style.display = 'none';
+              document.getElementById('chapterContent').value = '';
+              originalText = '';
+              updateCharCounter();
+              book = null; // Reset book object
+              hideLoading();
+              alert('Stored EPUB has been cleared.');
+              resolve();
+            };
+            request.onerror = (event) => {
+              console.error('Error clearing EPUB from IndexedDB:', event.target.error);
+              hideLoading();
+              alert('Failed to clear stored EPUB.');
+              reject(event.target.error);
+            };
+          });
+        }
+        // --- End IndexedDB Functions ---
+
+
+        document.addEventListener('DOMContentLoaded', async () => {
+          const chapterContentArea = document.getElementById('chapterContent');
+          chapterContentArea.addEventListener('input', () => {
+            originalText = chapterContentArea.value; // Update originalText when user types
+            updateCharCounter();
+          });
+          updateCharCounter(); // Initial count
+
+          const maxCharsInput = document.getElementById('maxChars');
+          const addToTopInput = document.getElementById('addToTop');
+          const addToBottomInput = document.getElementById('addToBottom');
+          const formatSelect = document.getElementById('formatSelect');
+
+          maxCharsInput.value = localStorage.getItem('maxChars') || '1800';
+          addToTopInput.value = localStorage.getItem('addToTopInput') || 'Translate to English (part $X of $Y):';
+          addToBottomInput.value = localStorage.getItem('addToBottomInput') || '';
+          formatSelect.value = localStorage.getItem('formatSelect') || 'pretty';
+
+          maxCharsInput.addEventListener('input', () => localStorage.setItem('maxChars', maxCharsInput.value));
+          addToTopInput.addEventListener('input', () => localStorage.setItem('addToTopInput', addToTopInput.value));
+          addToBottomInput.addEventListener('input', () => localStorage.setItem('addToBottomInput', addToBottomInput.value));
+          formatSelect.addEventListener('change', () => {
+            localStorage.setItem('formatSelect', formatSelect.value);
+            applyTextFormatting();
+          });
+          
+          document.getElementById('clearStoredEpub').addEventListener('click', clearEpubFromDB);
+          document.getElementById('clearTextarea').addEventListener('click', () => {
+            document.getElementById('chapterContent').value = '';
+            originalText = '';
+            updateCharCounter();
+            // Optionally clear TOC if you want this button to reset more
+            // document.getElementById('tocList').innerHTML = '';
+            // document.getElementById('tocContainer').style.display = 'none';
+            // book = null;
+          });
+
+          try {
+            await initDB();
+            await loadEpubFromDB(); // Attempt to load last EPUB
+          } catch (error) {
+            console.error("DB Initialization or load error:", error);
+          }
+          
+          applyTextFormatting(); // Initial format on load based on originalText
+        });
+
+        document.getElementById('epubInput').addEventListener('change', async function (event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          await handleFileProcessing(file);
+          if (file.name.toLowerCase().endsWith('.epub')) {
+            await saveEpubToDB(file); // Save EPUB to IndexedDB after processing
+          }
+        });
+        
+        async function handleFileProcessing(file) {
+          const fileName = file.name.toLowerCase();
+          const tocContainer = document.getElementById('tocContainer');
+          const tocList = document.getElementById('tocList');
+          
+          showLoading(`Processing ${file.name}...`);
+          try {
+            if (fileName.endsWith('.epub')) {
+              tocContainer.style.display = 'block';
+              // ePub constructor can take ArrayBuffer, which `file` will be if from IDB, or File object
+              book = ePub(file.type && file.data ? file.data : file); // file.data for IDB loaded file
+              
+              await book.ready; // Wait for book to be fully processed
+              const toc = await book.loaded.navigation;
+              tocList.innerHTML = ''; // Clear previous TOC
+
+              function addTocItems(items, parentElement) {
+                items.forEach(item => {
+                  const li = document.createElement('li');
+                  li.textContent = item.label.trim();
+                  li.dataset.href = item.href;
+                  li.addEventListener('click', loadChapter);
+                  parentElement.appendChild(li);
+
+                  if (item.subitems && item.subitems.length > 0) {
+                    const ul = document.createElement('ul');
+                    addTocItems(item.subitems, ul);
+                    li.appendChild(ul);
+                  }
+                });
+              }
+              addTocItems(toc.toc, tocList); // Use toc.toc for the navigation items array
+              // Auto-load first chapter if TOC is available
+              if (toc.toc.length > 0 && toc.toc[0].href) {
+                  const firstChapterHref = toc.toc[0].href;
+                  // Simulate a click on the first TOC item
+                  const firstLi = tocList.querySelector(`li[data-href="${firstChapterHref}"]`);
+                  if (firstLi) firstLi.click();
+              }
+
+
+            } else if (fileName.endsWith('.txt')) {
+              tocContainer.style.display = 'none';
+              tocList.innerHTML = '';
+              const reader = new FileReader();
+              reader.onload = function (e) {
+                originalText = e.target.result;
+                document.getElementById('chapterContent').value = originalText;
+                applyTextFormatting();
+                updateCharCounter();
+              }
+              reader.readAsText(file);
+            } else {
+              alert("Unsupported file type. Please upload .epub or .txt files.");
+            }
+          } catch (error) {
+            console.error("Error processing file:", error);
+            alert(`Failed to process file: ${error.message || error}. See console for details.`);
+          } finally {
+            hideLoading();
+          }
+        }
+
+
+        async function loadChapter(event) {
+          const targetLi = event.target.closest('li'); // Handle clicks on potential child elements
+          if (!targetLi || !targetLi.dataset.href) return;
+
+          const tocListItems = document.querySelectorAll('#tocList li');
+          tocListItems.forEach(item => item.classList.remove('selected'));
+          targetLi.classList.add('selected');
+
+          const selectedHref = targetLi.dataset.href;
+          showLoading("Loading chapter...");
+          try {
+            const chapter = await book.load(selectedHref); // book.load is deprecated, use book.section
+            const section = book.section(selectedHref);
+            const contents = await section.render(); // Get HTML content
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = contents;
+            originalText = tempDiv.innerText.trim() || tempDiv.textContent.trim(); // Extract text
+
+            document.getElementById('chapterContent').value = originalText;
+            applyTextFormatting();
+            updateCharCounter();
+          } catch (error) {
+            console.error("Error loading chapter:", error);
+            alert("Failed to load chapter. See console for details.");
+          } finally {
+            hideLoading();
+          }
+        }
+
+        function chunkText() {
+          const text = document.getElementById('chapterContent').value;
+          const maxChars = parseInt(document.getElementById('maxChars').value) || 1800;
+          const addToTop = document.getElementById('addToTop').value.trim();
+          const addToBottom = document.getElementById('addToBottom').value.trim();
+
+          if (!text.trim()) {
+            alert("No text to chunk. Please load a file or paste text.");
+            return;
+          }
+          
+          // Split by double newlines first (paragraphs), then single if needed
+          let paragraphs = text.split(/\n\s*\n/); // Split by one or more newlines between paragraphs
+          if (paragraphs.length <= 1 && text.includes('\n')) { // If not many paragraphs, try splitting by single newlines
+            paragraphs = text.split('\n');
+          }
+
+
+          const chunks = [];
+          let currentChunk = "";
+
+          for (const paragraph of paragraphs) {
+            const trimmedParagraph = paragraph.trim();
+            if (!trimmedParagraph) continue;
+
+            if ((currentChunk.length + trimmedParagraph.length + 2) <= maxChars || currentChunk.length === 0) {
+              currentChunk += (currentChunk.length > 0 ? '\n\n' : '') + trimmedParagraph;
+            } else {
+              chunks.push(currentChunk);
+              currentChunk = trimmedParagraph;
+            }
+          }
+
+          if (currentChunk) {
+            chunks.push(currentChunk);
+          }
+          
+          if (chunks.length === 0 && text.trim().length > 0) { // Handle case where text is smaller than maxChars
+             chunks.push(text.trim());
+          }
+
+
+          const totalChunks = chunks.length;
+          const chunkedTextContainer = document.getElementById('chunkedTextContainer');
+          chunkedTextContainer.innerHTML = ''; // Clear previous chunks
+
+          if (totalChunks === 0) {
+            chunkedTextContainer.textContent = "No chunks generated. Text might be empty or too short.";
+            return;
+          }
+
+          const digits = String(totalChunks).length;
+
+          chunks.forEach((chunk, index) => {
+            const partNumber = String(index + 1).padStart(digits, '0');
+            let finalChunk = chunk; // Start with the raw chunk
+
+            if (addToTop) {
+                finalChunk = addToTop.replace(/\$X/g, partNumber).replace(/\$Y/g, totalChunks) + '\n\n' + finalChunk;
+            }
+            if (addToBottom) {
+                finalChunk = finalChunk + '\n\n' + addToBottom.replace(/\$X/g, partNumber).replace(/\$Y/g, totalChunks);
+            }
+            finalChunk = finalChunk.trim();
+
+
+            const chunkDiv = document.createElement('div');
+            chunkDiv.classList.add('chunk-container');
+
+            const chunkTitle = document.createElement('div');
+            chunkTitle.classList.add('chunk-title');
+            chunkTitle.textContent = `Part ${partNumber} of ${totalChunks}`;
+
+            const chunkTextarea = document.createElement('textarea');
+            chunkTextarea.value = finalChunk;
+            chunkTextarea.readOnly = true;
+            chunkTextarea.classList.add('chunk-textarea');
+            chunkTextarea.rows = Math.max(5, Math.min(15, finalChunk.split('\n').length + 2));
+
+
+            const copyButton = document.createElement('button');
+            copyButton.classList.add('copy-button');
+            copyButton.innerHTML = 'Copy to Clipboard<span class="tick">✔️</span>';
+            copyButton.addEventListener('click', function () {
+              copyToClipboard(chunkTextarea.value);
+              updateButtonState(copyButton);
+            });
+
+            chunkDiv.appendChild(chunkTitle);
+            chunkDiv.appendChild(chunkTextarea);
+            chunkDiv.appendChild(copyButton);
+            chunkedTextContainer.appendChild(chunkDiv);
+          });
+        }
+
+        function copyToClipboard(text) {
+          navigator.clipboard.writeText(text).then(() => {
+            // Success feedback is handled by updateButtonState
+          }).catch(err => {
+            console.error('Failed to copy text: ', err);
+            // Fallback for older browsers (less common now)
+            const hiddenInput = document.createElement('textarea');
+            hiddenInput.value = text;
+            document.body.appendChild(hiddenInput);
+            hiddenInput.select();
+            try {
+              document.execCommand('copy');
+            } catch (e) {
+              console.error('Fallback copy to clipboard failed:', e);
+            }
+            document.body.removeChild(hiddenInput);
+          });
+        }
+
+        function applyTextFormatting() {
+          const formatSelect = document.getElementById('formatSelect');
+          const textArea = document.getElementById('chapterContent');
+          
+          // If originalText is empty (e.g. on first load before any file/paste),
+          // and textArea has content (e.g. from browser cache), use that as originalText.
+          if (!originalText && textArea.value) {
+            originalText = textArea.value;
+          }
+
+          if (formatSelect.value === 'pretty') {
+            // Split by one or more newlines, filter empty, join with double newlines
+            const paragraphs = originalText.split(/\n+/);
+            const formattedText = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
+            textArea.value = formattedText;
+          } else {
+            textArea.value = originalText; // Show as is
+          }
+          updateCharCounter();
+        }
+      </script>
+    </body>
+    </html>
+
