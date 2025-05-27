@@ -20,27 +20,57 @@
       border: 1px solid #ccc;
       padding: 10px;
       border-radius: 4px;
+      background-color: #f9f9f9;
     }
 
     #tocContainer ul {
-      padding-left: 20px;
-    }
-
-    #tocContainer ul ul {
-      list-style-type: circle;
+      padding-left: 0;
+      list-style: none;
     }
 
     #tocContainer li {
       cursor: pointer;
       margin-bottom: 5px;
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+      transition: background-color 0.2s ease;
+    }
+
+    #tocContainer li:last-child {
+      border-bottom: none;
+    }
+
+    #tocContainer li:hover {
+      background-color: #e9e9e9;
     }
 
     #tocContainer li.selected {
       background-color: #007BFF;
       color: white;
       border-radius: 4px;
-      padding: 2px 5px;
+      padding: 5px;
     }
+
+    #tocContainer li ul {
+      padding-left: 20px;
+      margin-top: 5px;
+      list-style: disc;
+    }
+
+    #tocContainer li ul li {
+      padding: 2px 0;
+      border-bottom: none;
+      margin-bottom: 2px;
+    }
+
+    #tocContainer li ul li:hover {
+      background-color: transparent;
+    }
+
+    #tocContainer li ul li.selected {
+      background-color: #0056b3;
+    }
+
 
     textarea {
       width: calc(100% - 20px);
