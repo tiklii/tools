@@ -45,9 +45,32 @@ function decrementEpubUsage(uniqueKey) {
 }
 
 
-// --- MODIFIED: Generic IndexedDB Functions ---
+// --- Generic IndexedDB Functions ---
 
-// Renamed for clarity
+async function openDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, dbVersion);
+
+    request.onupgradeneeded = function(event) {
+      const db = event.target.result;
+      if (db.objectStoreNames.contains(epubStoreName)) {
+        db.deleteObjectStore(epubStoreName);
+      }
+      db.createObjectStore(epubStoreName, {
+        keyPath: "uniqueKey"
+      });
+    };
+
+    request.onsuccess = function(event) {
+      resolve(event.target.result);
+    };
+
+    request.onerror = function(event) {
+      reject("Error opening database: " + event.target.errorCode);
+    };
+  });
+}
+
 async function storeFileInDB(file) {
   const db = await openDatabase();
   const transaction = db.transaction([epubStoreName], "readwrite");
@@ -55,7 +78,7 @@ async function storeFileInDB(file) {
   const uniqueKey = createUniqueFileKey(file);
   const data = {
     uniqueKey: uniqueKey,
-    fileName: file.name, // Keep original filename to check type later
+    fileName: file.name,
     blob: file,
     timestamp: new Date()
   };
@@ -66,7 +89,6 @@ async function storeFileInDB(file) {
   });
 }
 
-// Renamed for clarity - gets the whole record
 async function getFileRecordFromDB(uniqueKey) {
   const db = await openDatabase();
   const transaction = db.transaction([epubStoreName], "readonly");
@@ -113,132 +135,23 @@ async function cleanupOrphanedFiles() {
   }
 }
 
-// --- Other functions (some with minor changes) ---
-async function openDatabase() { /* ... unchanged ... */ }
-function updateButtonState(button) { /* ... unchanged ... */ }
-function updateCharCount() { /* ... unchanged ... */ }
-function chunkText() { /* ... unchanged ... */ }
-function copyToClipboard(text) { /* ... unchanged ... */ }
-function formatText() { /* ... unchanged ... */ }
+// --- UI and Utility Functions ---
 
-// --- (Paste the unchanged utility functions here to save space) ---
-async function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName, dbVersion);
-
-    request.onupgradeneeded = function(event) {
-      const db = event.target.result;
-      if (db.objectStoreNames.contains(epubStoreName)) {
-        db.deleteObjectStore(epubStoreName);
-      }
-      db.createObjectStore(epubStoreName, {
-        keyPath: "uniqueKey"
-      });
-    };
-
-    request.onsuccess = function(event) {
-      resolve(event.target.result);
-    };
-
-    request.onerror = function(event) {
-      reject("Error opening database: " + event.target.errorCode);
-    };
-  });
-}
 function updateButtonState(button) {
   if (lastClickedButton && lastClickedButton !== button) {
     lastClickedButton.classList.remove('green');
     lastClickedButton.querySelector('.tick').style.display = 'none';
   }
-
   button.classList.add('green');
   button.querySelector('.tick').style.display = 'inline-block';
   lastClickedButton = button;
 }
+
 function updateCharCount() {
   const text = document.getElementById('chapterContent').value;
   document.getElementById('charCount').textContent = `Total characters: ${text.length}`;
 }
-function chunkText() {
-  const text = document.getElementById('chapterContent').value;
-  const maxChars = parseInt(document.getElementById('maxChars').value);
-  const addToTop = document.getElementById('addToTop').value.trim();
-  const addToBottom = document.getElementById('addToBottom').value.trim();
-  const paragraphs = text.split('\n');
-  const chunks = [];
-  let currentChunk = "";
-  for (const paragraph of paragraphs) {
-    const paragraphToAdd = currentChunk.length > 0 ? '\n' + paragraph : paragraph;
-    if ((currentChunk.length + paragraphToAdd.length) <= maxChars) {
-      currentChunk += paragraphToAdd;
-    } else {
-      if (currentChunk.trim()) {
-        chunks.push(currentChunk.trim());
-      }
-      currentChunk = paragraph;
-    }
-  }
-  if (currentChunk.trim()) {
-    chunks.push(currentChunk.trim());
-  }
-  const totalChunks = chunks.length;
-  const chunkedTextContainer = document.getElementById('chunkedTextContainer');
-  chunkedTextContainer.innerHTML = '';
-  const digits = String(totalChunks).length;
-  chunks.forEach((chunk, index) => {
-    const partNumber = String(index + 1).padStart(digits, '0');
-    let finalChunk = (addToTop.replace('$X', partNumber).replace('$Y', totalChunks) + '\n\n' + chunk + '\n\n' + addToBottom.replace('$X', partNumber).replace('$Y', totalChunks)).trim();
-    const chunkContainer = document.createElement('div');
-    chunkContainer.classList.add('chunk-container');
-    const chunkTitle = document.createElement('div');
-    chunkTitle.classList.add('chunk-title');
-    chunkTitle.textContent = `Part ${partNumber}`;
-    const chunkTextarea = document.createElement('textarea');
-    chunkTextarea.value = finalChunk;
-    chunkTextarea.readOnly = true;
-    const copyButton = document.createElement('button');
-    copyButton.classList.add('copy-button');
-    copyButton.innerHTML = 'Copy to Clipboard<span class="tick">✔️</span>';
-    copyButton.addEventListener('click', function() {
-      copyToClipboard(chunkTextarea.value);
-      updateButtonState(copyButton);
-    });
-    chunkContainer.appendChild(chunkTitle);
-    chunkContainer.appendChild(chunkTextarea);
-    chunkContainer.appendChild(copyButton);
-    chunkedTextContainer.appendChild(chunkContainer);
-  });
-}
-function copyToClipboard(text) {
-  const hiddenInput = document.createElement('textarea');
-  hiddenInput.value = text;
-  document.body.appendChild(hiddenInput);
-  hiddenInput.select();
-  try {
-    document.execCommand('copy');
-  } catch (err) {
-    console.error('Copy to clipboard failed:', err);
-  }
-  document.body.removeChild(hiddenInput);
-}
-function formatText() {
-  const formatSelect = document.getElementById('formatSelect');
-  const textArea = document.getElementById('chapterContent');
-  if (originalText === null && textArea.value) {
-    originalText = textArea.value;
-  }
-  if (formatSelect.value === 'pretty' && originalText) {
-    const paragraphs = originalText.split('\n');
-    const formattedText = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
-    textArea.value = formattedText;
-  } else if (originalText) {
-    textArea.value = originalText;
-  }
-  updateCharCount();
-}
 
-
-// MODIFIED: Chapter loading now populates the text area
 async function loadChapterContent(href) {
   try {
     const chapter = await book.load(href);
@@ -317,7 +230,87 @@ function restoreTocState() {
   }
 }
 
-// --- HEAVILY MODIFIED: Event Listeners ---
+function chunkText() {
+  const text = document.getElementById('chapterContent').value;
+  const maxChars = parseInt(document.getElementById('maxChars').value);
+  const addToTop = document.getElementById('addToTop').value.trim();
+  const addToBottom = document.getElementById('addToBottom').value.trim();
+  const paragraphs = text.split('\n');
+  const chunks = [];
+  let currentChunk = "";
+  for (const paragraph of paragraphs) {
+    const paragraphToAdd = currentChunk.length > 0 ? '\n' + paragraph : paragraph;
+    if ((currentChunk.length + paragraphToAdd.length) <= maxChars) {
+      currentChunk += paragraphToAdd;
+    } else {
+      if (currentChunk.trim()) {
+        chunks.push(currentChunk.trim());
+      }
+      currentChunk = paragraph;
+    }
+  }
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+  const totalChunks = chunks.length;
+  const chunkedTextContainer = document.getElementById('chunkedTextContainer');
+  chunkedTextContainer.innerHTML = '';
+  const digits = String(totalChunks).length;
+  chunks.forEach((chunk, index) => {
+    const partNumber = String(index + 1).padStart(digits, '0');
+    let finalChunk = (addToTop.replace('$X', partNumber).replace('$Y', totalChunks) + '\n\n' + chunk + '\n\n' + addToBottom.replace('$X', partNumber).replace('$Y', totalChunks)).trim();
+    const chunkContainer = document.createElement('div');
+    chunkContainer.classList.add('chunk-container');
+    const chunkTitle = document.createElement('div');
+    chunkTitle.classList.add('chunk-title');
+    chunkTitle.textContent = `Part ${partNumber}`;
+    const chunkTextarea = document.createElement('textarea');
+    chunkTextarea.value = finalChunk;
+    chunkTextarea.readOnly = true;
+    const copyButton = document.createElement('button');
+    copyButton.classList.add('copy-button');
+    copyButton.innerHTML = 'Copy to Clipboard<span class="tick">✔️</span>';
+    copyButton.addEventListener('click', function() {
+      copyToClipboard(chunkTextarea.value);
+      updateButtonState(copyButton);
+    });
+    chunkContainer.appendChild(chunkTitle);
+    chunkContainer.appendChild(chunkTextarea);
+    chunkContainer.appendChild(copyButton);
+    chunkedTextContainer.appendChild(chunkContainer);
+  });
+}
+
+function copyToClipboard(text) {
+  const hiddenInput = document.createElement('textarea');
+  hiddenInput.value = text;
+  document.body.appendChild(hiddenInput);
+  hiddenInput.select();
+  try {
+    document.execCommand('copy');
+  } catch (err) {
+    console.error('Copy to clipboard failed:', err);
+  }
+  document.body.removeChild(hiddenInput);
+}
+
+function formatText() {
+  const formatSelect = document.getElementById('formatSelect');
+  const textArea = document.getElementById('chapterContent');
+  if (originalText === null && textArea.value) {
+    originalText = textArea.value;
+  }
+  if (formatSelect.value === 'pretty' && originalText) {
+    const paragraphs = originalText.split('\n');
+    const formattedText = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
+    textArea.value = formattedText;
+  } else if (originalText) {
+    textArea.value = originalText;
+  }
+  updateCharCount();
+}
+
+// --- Event Listeners ---
 
 document.addEventListener('DOMContentLoaded', async () => {
   const currentFileKey = sessionStorage.getItem(sessionKey);
@@ -331,7 +324,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const maxCharsInput = document.getElementById('maxChars');
   maxCharsInput.value = localStorage.getItem('maxChars') || '1800';
   maxCharsInput.addEventListener('input', () => localStorage.setItem('maxChars', maxCharsInput.value));
-  // ... (rest of UI setup) ...
   const addToTopInput = document.getElementById('addToTop');
   addToTopInput.value = localStorage.getItem('addToTop') || 'Translate to English (part $X of $Y):';
   addToTopInput.addEventListener('input', () => localStorage.setItem('addToTop', addToTopInput.value));
@@ -357,7 +349,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const toc = await book.loaded.navigation;
         renderToc(toc);
         restoreTocState();
-        // NEW: Load last viewed chapter content
         const lastChapter = sessionStorage.getItem('currentChapterHref');
         if (lastChapter) {
           await loadChapterContent(lastChapter);
@@ -385,8 +376,8 @@ document.getElementById('epubInput').addEventListener('change', async function(e
   const oldFileKey = sessionStorage.getItem(sessionKey);
   decrementEpubUsage(oldFileKey);
   sessionStorage.clear();
-  document.getElementById('tocList').innerHTML = ''; // Clear TOC
-  document.getElementById('chapterContent').value = ''; // Clear text area
+  document.getElementById('tocList').innerHTML = '';
+  document.getElementById('chapterContent').value = '';
   originalText = null;
   updateCharCount();
 
@@ -412,14 +403,15 @@ document.getElementById('epubInput').addEventListener('change', async function(e
 
     } catch (error) {
       console.error("Error handling file input:", error);
-      decrementEpubUsage(uniqueKey); // Undo increment on error
+      decrementEpubUsage(uniqueKey);
       sessionStorage.clear();
       alert("Failed to load or store file. See console for details.");
     }
   } else {
     alert("Unsupported file type. Please upload .epub or .txt files.");
   }
-  event.target.value = ''; // Clear file input
+  // THE FIX: This line has been removed.
+  // event.target.value = '';
 });
 
 window.addEventListener('beforeunload', () => {
