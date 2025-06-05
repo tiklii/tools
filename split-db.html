@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EPUB Text Chunker</title>
+  <script src="./script/jszip.min.js"></script>
+  <script src="./script/epub.min.js"></script>
+  <link rel="stylesheet" href="./split/style.css" />
+</head>
+
+<body>
+  <h1>EPUB Text Chunker</h1>
+  <p>Select an EPUB or txt file:</p>
+
+  <input type="file" id="epubInput" accept=".epub, .txt">
+
+  <div id="tocContainer">
+    <label>Table of Contents:</label>
+    <ul id="tocList"></ul>
+  </div>
+
+  <textarea id="chapterContent" placeholder="Paste text..."></textarea>
+  <div id="charCount">Total characters: 0</div>
+
+  <div class="input-container">
+    <label for="maxChars">Max characters per chunk:</label>
+    <input type="number" id="maxChars" value="1800">
+  </div>
+
+  <div class="input-container">
+    <label for="formatSelect">Format text:</label>
+    <select id="formatSelect">
+      <option value="as-is">Show text as is</option>
+      <option value="pretty">Pretty</option>
+    </select>
+  </div>
+
+  <div class="input-container">
+    <label for="addToTop">Add to top of each chunk:</label>
+    <textarea id="addToTop"
+      placeholder="Text to add to the top of each chunk (use $X for part number, $Y for total parts)..."></textarea>
+  </div>
+
+  <div class="input-container">
+    <label for="addToBottom">Add to bottom of each chunk:</label>
+    <textarea id="addToBottom"
+      placeholder="Text to add to the bottom of each chunk (use $X for part number, $Y for total parts)..."></textarea>
+  </div>
+
+  <button onclick="chunkText()">Split
+    Text</button>
+
+  <div id="chunkedTextContainer"></div>
+
+  <script src="./split/split-db.js"></script>
+</body>
+
+</html>
