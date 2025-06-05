@@ -1,9 +1,16 @@
 let book;
 let lastClickedButton = null;
-let originalText = null; // Store the original unformatted text
+let originalText = null;
 const dbName = "epubChunkerDB";
-const dbVersion = 2; // Increment database version for schema changes
+const dbVersion = 3; // MODIFIED: Increment DB version to trigger schema update
 const epubStoreName = "epubs";
+
+// NEW: Helper function to create a robust, unique key for a file
+function createUniqueFileKey(file) {
+  // Combines filename and last modified timestamp for a very unique key
+  return `${file.name.toLowerCase()}_${file.lastModified}`;
+}
+
 
 function updateButtonState(button) {
   if (lastClickedButton && lastClickedButton !== button) {
@@ -21,18 +28,20 @@ function updateCharCount() {
   document.getElementById('charCount').textContent = `Total characters: ${text.length}`;
 }
 
-// IndexedDB Functions (No changes here)
+// IndexedDB Functions
 async function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(dbName, dbVersion);
 
     request.onupgradeneeded = function(event) {
       const db = event.target.result;
-      if (!db.objectStoreNames.contains(epubStoreName)) {
-        db.createObjectStore(epubStoreName, {
-          keyPath: "fileName"
-        });
+      // MODIFIED: Re-create the object store with the new keyPath
+      if (db.objectStoreNames.contains(epubStoreName)) {
+        db.deleteObjectStore(epubStoreName);
       }
+      db.createObjectStore(epubStoreName, {
+        keyPath: "uniqueKey" // MODIFIED: The new primary key
+      });
     };
 
     request.onsuccess = function(event) {
@@ -45,14 +54,18 @@ async function openDatabase() {
   });
 }
 
-async function storeEpub(fileName, epubBlob) {
+// MODIFIED: Function now accepts the full File object to create the key
+async function storeEpub(file) {
   const db = await openDatabase();
   const transaction = db.transaction([epubStoreName], "readwrite");
   const store = transaction.objectStore(epubStoreName);
 
+  const uniqueKey = createUniqueFileKey(file);
+
   const data = {
-    fileName: fileName,
-    blob: epubBlob,
+    uniqueKey: uniqueKey, // The new primary key
+    fileName: file.name, // We still store the original filename for display
+    blob: file,
     timestamp: new Date()
   };
 
@@ -60,7 +73,7 @@ async function storeEpub(fileName, epubBlob) {
 
   return new Promise((resolve, reject) => {
     request.onsuccess = function() {
-      console.log(`EPUB "${fileName}" stored in IndexedDB.`);
+      console.log(`EPUB "${file.name}" stored in IndexedDB with key "${uniqueKey}".`);
       resolve();
     };
 
@@ -71,21 +84,22 @@ async function storeEpub(fileName, epubBlob) {
   });
 }
 
-async function getEpub(fileName) {
+// MODIFIED: Function now gets by the unique key
+async function getEpub(uniqueKey) {
   const db = await openDatabase();
   const transaction = db.transaction([epubStoreName], "readonly");
   const store = transaction.objectStore(epubStoreName);
 
-  const request = store.get(fileName);
+  const request = store.get(uniqueKey);
 
   return new Promise((resolve, reject) => {
     request.onsuccess = function() {
       if (request.result) {
-        console.log(`EPUB "${fileName}" retrieved from IndexedDB.`);
+        console.log(`EPUB with key "${uniqueKey}" retrieved from IndexedDB.`);
         resolve(request.result.blob);
       } else {
-        console.log(`EPUB "${fileName}" not found in IndexedDB.`);
-        resolve(null); // Not found
+        console.log(`EPUB with key "${uniqueKey}" not found in IndexedDB.`);
+        resolve(null);
       }
     };
 
@@ -96,7 +110,19 @@ async function getEpub(fileName) {
   });
 }
 
-// TOC Rendering and State Functions
+// TOC and State functions remain the same, as they don't interact with the DB directly
+function renderToc(toc) { /* ... no changes ... */ }
+function restoreTocState() { /* ... no changes ... */ }
+async function loadChapterAndSaveState(event) { /* ... no changes ... */ }
+function extractText(chapterDocument) { /* ... no changes ... */ }
+
+// Chunking and UI functions remain the same
+function chunkText() { /* ... no changes ... */ }
+function copyToClipboard(text) { /* ... no changes ... */ }
+function formatText() { /* ... no changes ... */ }
+
+
+// --- Functions from above that have no changes ---
 function renderToc(toc) {
   const tocList = document.getElementById('tocList');
   tocList.innerHTML = ''; // Clear previous TOC
@@ -121,17 +147,16 @@ function renderToc(toc) {
 }
 
 function restoreTocState() {
-  // MODIFIED: Use sessionStorage for tab-specific state
   const currentChapterHref = sessionStorage.getItem('currentChapterHref');
   const tocScrollTop = sessionStorage.getItem('currentTocScrollTop');
   const tocContainer = document.getElementById('tocContainer');
 
-  if (currentChapterHref) { // MODIFIED
+  if (currentChapterHref) {
     const tocListItems = document.querySelectorAll('#tocList li');
     let selectedElement = null;
     tocListItems.forEach(item => {
       item.classList.remove('selected');
-      if (item.dataset.href === currentChapterHref) { // MODIFIED
+      if (item.dataset.href === currentChapterHref) {
         item.classList.add('selected');
         selectedElement = item;
       }
@@ -151,7 +176,6 @@ function restoreTocState() {
   }
 }
 
-// Load Chapter Function with State Saving
 async function loadChapterAndSaveState(event) {
   const tocListItems = document.querySelectorAll('#tocList li');
   tocListItems.forEach(item => item.classList.remove('selected'));
@@ -160,7 +184,6 @@ async function loadChapterAndSaveState(event) {
   const selectedHref = event.target.dataset.href;
   const tocContainer = document.getElementById('tocContainer');
 
-  // MODIFIED: Save the state to sessionStorage for this tab only
   sessionStorage.setItem('currentChapterHref', selectedHref);
   sessionStorage.setItem('currentTocScrollTop', tocContainer.scrollTop);
 
@@ -180,7 +203,6 @@ function extractText(chapterDocument) {
   return chapterDocument.body.innerText.trim();
 }
 
-// Modified chunkText function based on the non-IndexedDB script (No changes here)
 function chunkText() {
   const text = document.getElementById('chapterContent').value;
   const maxChars = parseInt(document.getElementById('maxChars').value);
@@ -276,6 +298,8 @@ function formatText() {
   }
   updateCharCount();
 }
+// --- END of unchanged functions ---
+
 
 // Initial load logic
 document.addEventListener('DOMContentLoaded', async () => {
@@ -285,28 +309,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const formatSelect = document.getElementById('formatSelect');
   const chapterContentTextArea = document.getElementById('chapterContent');
 
-  // These settings are global, so they remain in localStorage
+  // Global settings in localStorage are fine
   maxCharsInput.value = localStorage.getItem('maxChars') || '1800';
-  const addToTopDefault = 'Translate to English (part $X of $Y):';
-  addToTopInput.value = localStorage.getItem('addToTop') || addToTopDefault;
-  const addToBottomDefault = '';
-  addToBottomInput.value = localStorage.getItem('addToBottom') || addToBottomDefault;
-  const savedFormat = localStorage.getItem('formatSelect');
-  if (savedFormat) {
-    formatSelect.value = savedFormat;
-  } else {
-    formatSelect.value = 'pretty';
-  }
+  addToTopInput.value = localStorage.getItem('addToTop') || 'Translate to English (part $X of $Y):';
+  addToBottomInput.value = localStorage.getItem('addToBottom') || '';
+  formatSelect.value = localStorage.getItem('formatSelect') || 'pretty';
 
-  maxCharsInput.addEventListener('input', () => {
-    localStorage.setItem('maxChars', maxCharsInput.value);
-  });
-  addToTopInput.addEventListener('input', () => {
-    localStorage.setItem('addToTop', addToTopInput.value);
-  });
-  addToBottomInput.addEventListener('input', () => {
-    localStorage.setItem('addToBottom', addToBottomInput.value);
-  });
+  maxCharsInput.addEventListener('input', () => localStorage.setItem('maxChars', maxCharsInput.value));
+  addToTopInput.addEventListener('input', () => localStorage.setItem('addToTop', addToTopInput.value));
+  addToBottomInput.addEventListener('input', () => localStorage.setItem('addToBottom', addToBottomInput.value));
   formatSelect.addEventListener('change', () => {
     localStorage.setItem('formatSelect', formatSelect.value);
     formatText();
@@ -314,27 +325,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   chapterContentTextArea.addEventListener('input', updateCharCount);
 
-  // MODIFIED: Attempt to load EPUB for THIS TAB from sessionStorage
-  const currentEpubFile = sessionStorage.getItem('currentEpubFile');
-  if (currentEpubFile) {
+  // MODIFIED: Load EPUB using the unique key from sessionStorage
+  const currentEpubKey = sessionStorage.getItem('currentEpubKey');
+  if (currentEpubKey) {
     try {
-      const epubBlob = await getEpub(currentEpubFile);
+      const epubBlob = await getEpub(currentEpubKey); // Use the key
       if (epubBlob) {
         book = ePub(epubBlob);
         const toc = await book.loaded.navigation;
         renderToc(toc);
-        restoreTocState(); // Restore selected chapter and scroll position for this tab
-        console.log(`Loaded EPUB "${currentEpubFile}" from IndexedDB for this tab and restored state.`);
+        restoreTocState();
+        console.log(`Loaded EPUB with key "${currentEpubKey}" for this tab.`);
       } else {
-        // EPUB not in DB, clear sessionStorage state for it
-        sessionStorage.removeItem('currentEpubFile');
+        sessionStorage.removeItem('currentEpubKey');
         sessionStorage.removeItem('currentChapterHref');
         sessionStorage.removeItem('currentTocScrollTop');
       }
     } catch (error) {
       console.error("Error loading EPUB from IndexedDB or parsing:", error);
-      // Clear state if loading/parsing fails
-      sessionStorage.removeItem('currentEpubFile');
+      sessionStorage.removeItem('currentEpubKey');
       sessionStorage.removeItem('currentChapterHref');
       sessionStorage.removeItem('currentTocScrollTop');
       alert("Failed to load the last used EPUB for this tab. Please re-select the file.");
@@ -345,60 +354,55 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateCharCount();
 });
 
+
 // Modified file input listener
 document.getElementById('epubInput').addEventListener('change', async function(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const fileName = file.name.toLowerCase();
-
-  // Clear tab-specific state before loading a new file
-  sessionStorage.removeItem('currentEpubFile');
+  // Clear previous tab state before loading a new file
+  sessionStorage.removeItem('currentEpubKey');
   sessionStorage.removeItem('currentChapterHref');
   sessionStorage.removeItem('currentTocScrollTop');
 
-  if (fileName.endsWith('.epub')) {
+  if (file.name.toLowerCase().endsWith('.epub')) {
     try {
-      // Store the epub file in the shared IndexedDB
-      await storeEpub(fileName, file);
+      // MODIFIED: Generate the key and store the file using the full file object
+      const uniqueKey = createUniqueFileKey(file);
+      await storeEpub(file);
 
-      // MODIFIED: Store the filename in this tab's sessionStorage
-      sessionStorage.setItem('currentEpubFile', fileName);
+      // MODIFIED: Store the unique key in this tab's sessionStorage
+      sessionStorage.setItem('currentEpubKey', uniqueKey);
 
       // Load the book and display TOC
       book = ePub(file);
       const toc = await book.loaded.navigation;
       renderToc(toc);
 
-      // Clear the content area for the new book
+      // Clear the content area
       document.getElementById('chapterContent').value = '';
       originalText = null;
       updateCharCount();
       document.getElementById('chunkedTextContainer').innerHTML = '';
 
-
     } catch (error) {
       console.error("Error loading or storing EPUB:", error);
       alert("Failed to load or store EPUB. See console for details.");
-      // Clear state on error
-      sessionStorage.removeItem('currentEpubFile');
+      sessionStorage.removeItem('currentEpubKey'); // Clean up on error
     }
-  } else if (fileName.endsWith('.txt')) {
+  } else if (file.name.toLowerCase().endsWith('.txt')) {
     const reader = new FileReader();
     reader.onload = function(e) {
       originalText = e.target.result;
       document.getElementById('chapterContent').value = originalText;
       formatText();
       updateCharCount();
-      // For TXT, there's no EPUB state to manage, so we clear it.
-      sessionStorage.removeItem('currentEpubFile');
-      sessionStorage.removeItem('currentChapterHref');
-      sessionStorage.removeItem('currentTocScrollTop');
-      document.getElementById('chunkedTextContainer').innerHTML = ''; // Clear previous chunks
+      // No EPUB state to manage for TXT files
+      document.getElementById('chunkedTextContainer').innerHTML = '';
     }
     reader.readAsText(file);
   } else {
     alert("Unsupported file type. Please upload .epub or .txt files.");
-    event.target.value = ''; // Clear the file input
+    event.target.value = '';
   }
 });
