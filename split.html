@@ -22,11 +22,18 @@
     <ul id="tocList"></ul>
   </div>
 
-  <textarea id="chapterContent" placeholder="Paste text..."></textarea>
+  <div class="chapter-preview-container">
+    <button id="copyChapterButton" class="copy-button">Copy<span class="tick">✔️</span></button>
+    <textarea id="chapterContent" placeholder="Paste text..."></textarea>
+  </div>
+<!-- Remove or comment this out:
   <div class="chapter-controls">
-    <div id="charCount">Total characters: 0</div>
     <button id="copyChapterButton" class="copy-button">Copy<span class="tick">✔️</span></button>
   </div>
+
+  <textarea id="chapterContent" placeholder="Paste text..."></textarea>
+-->
+  <div id="charCount">Total characters: 0</div>
 
   <div class="input-container">
     <label for="maxChars">Max characters per chunk:</label>
