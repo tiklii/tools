@@ -337,6 +337,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     formatText();
   });
   document.getElementById('chapterContent').addEventListener('input', updateCharCount);
+  document.getElementById('copyChapterButton').addEventListener('click', function() {
+    const chapterText = document.getElementById('chapterContent').value;
+    copyToClipboard(chapterText);
+    updateButtonState(this);
+  });
+
 
   // File Restoration Logic
   if (currentFileKey) {
