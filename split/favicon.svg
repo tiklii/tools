@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Light blue background -->
+  <rect width="64" height="64" rx="10" fill="#ADD8E6"/>
+
+  <!-- Left half of T: darker blue -->
+  <path d="M20 16 H44 V24 H32 V48 H24 V24 H20 Z" fill="#1E90FF"/>
+
+  <!-- Right half of T: slightly different darker blue -->
+  <path d="M32 16 H44 V24 H36 V48 H28 V24 H32 Z" fill="#104E8B"/>
+</svg>
+
