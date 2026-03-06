@@ -58,6 +58,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   chapterContentTextArea.addEventListener('input', updateCharCount);
 
+  // Split Button Hold Logic
+  const splitBtn = document.getElementById('splitButton');
+  let pressTimer;
+  let isLongPress = false;
+
+  splitBtn.addEventListener('pointerdown', () => {
+    isLongPress = false;
+    pressTimer = window.setTimeout(() => {
+      isLongPress = true;
+      chunkText(true); // Split ignoring extras
+    }, 600); // 600ms threshold for "short hold"
+  });
+
+  splitBtn.addEventListener('pointerup', () => clearTimeout(pressTimer));
+  splitBtn.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+  splitBtn.addEventListener('click', () => {
+    if (!isLongPress) {
+      chunkText(false); // Normal split
+    }
+  });
+
   // Initial format and char count on load
   formatText();
   updateCharCount();
@@ -136,11 +158,12 @@ function extractText(chapterDocument) {
   return chapterDocument.body.innerText.trim();
 }
 
-function chunkText() {
+function chunkText(ignoreExtras = false) {
   const text = document.getElementById('chapterContent').value;
   const maxChars = parseInt(document.getElementById('maxChars').value);
-  const addToTop = document.getElementById('addToTop').value.trim();
-  const addToBottom = document.getElementById('addToBottom').value.trim();
+
+  let addToTop = ignoreExtras ? "" : document.getElementById('addToTop').value.trim();
+  let addToBottom = ignoreExtras ? "" : document.getElementById('addToBottom').value.trim();
 
   const paragraphs = text.split('\n');
   const chunks = [];

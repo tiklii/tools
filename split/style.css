@@ -123,7 +123,7 @@ textarea {
   font-size: 13px;
   color: #555;
   text-align: right;
-  margin-bottom: 20;
+  margin-bottom: 20px;
 }
 
 .input-container {
@@ -186,7 +186,8 @@ textarea {
   display: inline-block;
 }
 
-button[onclick="chunkText()"] {
+/* Updated selector to target the ID and added user-select for hold action */
+#splitButton {
   padding: 12px 25px;
   background-color: #28a745;
   color: white;
@@ -196,9 +197,11 @@ button[onclick="chunkText()"] {
   font-size: 16px;
   margin-top: 10px;
   transition: background-color 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-button[onclick="chunkText()"]:hover {
+#splitButton:hover {
   background-color: #218838;
 }
 
