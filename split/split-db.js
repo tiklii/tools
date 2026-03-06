@@ -165,6 +165,8 @@ async function loadChapterContent(href) {
 }
 
 async function loadChapterAndSaveState(event) {
+  event.stopPropagation(); // PREVENT PARENT CLICKS
+
   // RESET COPY BUTTON STATE
   const copyBtn = document.getElementById('copyChapterButton');
   copyBtn.classList.remove('green');
@@ -239,7 +241,7 @@ function restoreTocState() {
 function chunkText(ignoreExtras = false) {
   const text = document.getElementById('chapterContent').value;
   const maxChars = parseInt(document.getElementById('maxChars').value);
-
+  
   let addToTop = ignoreExtras ? "" : document.getElementById('addToTop').value.trim();
   let addToBottom = ignoreExtras ? "" : document.getElementById('addToBottom').value.trim();
 

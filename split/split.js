@@ -131,6 +131,8 @@ document.getElementById('epubInput').addEventListener('change', async function (
 });
 
 async function loadChapter(event) {
+  event.stopPropagation(); // PREVENT PARENT CLICKS
+
   // RESET COPY BUTTON STATE
   const copyBtn = document.getElementById('copyChapterButton');
   copyBtn.classList.remove('green');
