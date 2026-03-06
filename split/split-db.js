@@ -241,7 +241,7 @@ function restoreTocState() {
 function chunkText(ignoreExtras = false) {
   const text = document.getElementById('chapterContent').value;
   const maxChars = parseInt(document.getElementById('maxChars').value);
-  
+
   let addToTop = ignoreExtras ? "" : document.getElementById('addToTop').value.trim();
   let addToBottom = ignoreExtras ? "" : document.getElementById('addToBottom').value.trim();
 
@@ -264,19 +264,29 @@ function chunkText(ignoreExtras = false) {
   }
   const totalChunks = chunks.length;
   const chunkedTextContainer = document.getElementById('chunkedTextContainer');
+
+  // Clear previous content
   chunkedTextContainer.innerHTML = '';
+
+  // Use DocumentFragment to prevent browser layout thrashing
+  const fragment = document.createDocumentFragment();
   const digits = String(totalChunks).length;
+
   chunks.forEach((chunk, index) => {
     const partNumber = String(index + 1).padStart(digits, '0');
     let finalChunk = (addToTop.replace('$X', partNumber).replace('$Y', totalChunks) + '\n\n' + chunk + '\n\n' + addToBottom.replace('$X', partNumber).replace('$Y', totalChunks)).trim();
+
     const chunkContainer = document.createElement('div');
     chunkContainer.classList.add('chunk-container');
+
     const chunkTitle = document.createElement('div');
     chunkTitle.classList.add('chunk-title');
     chunkTitle.textContent = `Part ${partNumber}`;
+
     const chunkTextarea = document.createElement('textarea');
     chunkTextarea.value = finalChunk;
     chunkTextarea.readOnly = true;
+
     const copyButton = document.createElement('button');
     copyButton.classList.add('copy-button');
     copyButton.innerHTML = 'Copy to Clipboard<span class="tick">✔️</span>';
@@ -284,11 +294,17 @@ function chunkText(ignoreExtras = false) {
       copyToClipboard(chunkTextarea.value);
       updateButtonState(copyButton);
     });
+
     chunkContainer.appendChild(chunkTitle);
     chunkContainer.appendChild(chunkTextarea);
     chunkContainer.appendChild(copyButton);
-    chunkedTextContainer.appendChild(chunkContainer);
+
+    // Add to fragment (off-screen)
+    fragment.appendChild(chunkContainer);
   });
+
+  // Render everything at once (on-screen)
+  chunkedTextContainer.appendChild(fragment);
 }
 
 function copyToClipboard(text) {
