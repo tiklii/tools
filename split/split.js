@@ -90,7 +90,7 @@ document.getElementById('epubInput').addEventListener('change', async function (
       }
 
       addTocItems(toc, tocList);
-    } else if (fileName.endsWith('.txt')) {
+    } else if (fileName.endsWith('.txt') || fileName.endsWith('.md')) {
       const reader = new FileReader();
       reader.onload = function (e) {
         originalText = e.target.result;
@@ -100,7 +100,7 @@ document.getElementById('epubInput').addEventListener('change', async function (
       }
       reader.readAsText(file);
     } else {
-      alert("Unsupported file type. Please upload .epub or .txt files.");
+      alert("Unsupported file type. Please upload .epub, .txt, or .md files.");
     }
   } catch (error) {
     console.error("Error loading file:", error);

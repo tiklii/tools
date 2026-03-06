@@ -359,7 +359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (lastChapter) {
           await loadChapterContent(lastChapter);
         }
-      } else if (record.fileName.endsWith('.txt')) {
+      } else if (record.fileName.endsWith('.txt') || record.fileName.endsWith('.md')) {
         originalText = await record.blob.text();
         document.getElementById('chapterContent').value = originalText;
         formatText();
@@ -390,7 +390,7 @@ document.getElementById('epubInput').addEventListener('change', async function(e
   const uniqueKey = createUniqueFileKey(file);
   const fileType = file.name.toLowerCase();
 
-  if (fileType.endsWith('.epub') || fileType.endsWith('.txt')) {
+  if (fileType.endsWith('.epub') || fileType.endsWith('.txt') || fileType.endsWith('.md')) {
     try {
       await storeFileInDB(file);
       sessionStorage.setItem(sessionKey, uniqueKey);
@@ -400,7 +400,7 @@ document.getElementById('epubInput').addEventListener('change', async function(e
         book = ePub(file);
         const toc = await book.loaded.navigation;
         renderToc(toc);
-      } else { // It's a .txt file
+      } else { // It's a .txt or .md file
         originalText = await file.text();
         document.getElementById('chapterContent').value = originalText;
         formatText();
@@ -414,7 +414,7 @@ document.getElementById('epubInput').addEventListener('change', async function(e
       alert("Failed to load or store file. See console for details.");
     }
   } else {
-    alert("Unsupported file type. Please upload .epub or .txt files.");
+    alert("Unsupported file type. Please upload .epub, .txt, or .md files.");
   }
   // THE FIX: This line has been removed.
   // event.target.value = '';
