@@ -165,6 +165,12 @@ async function loadChapterContent(href) {
 }
 
 async function loadChapterAndSaveState(event) {
+  // RESET COPY BUTTON STATE
+  const copyBtn = document.getElementById('copyChapterButton');
+  copyBtn.classList.remove('green');
+  copyBtn.querySelector('.tick').style.display = 'none';
+  if (lastClickedButton === copyBtn) lastClickedButton = null;
+
   const tocListItems = document.querySelectorAll('#tocList li');
   tocListItems.forEach(item => item.classList.remove('selected'));
   event.target.classList.add('selected');
