@@ -165,6 +165,11 @@ function renderToc(toc, bookId) {
 
       labelDiv.addEventListener('click', (e) => {
         e.stopPropagation();
+        
+        // Save the EXACT scroll Y-coordinate at the moment of selection
+        const tocContainer = document.getElementById('tocContainer');
+        sessionStorage.setItem('tocScroll_' + bookId, tocContainer.scrollTop);
+
         let spineIndex = 0;
         if (book && book.spine) {
           const section = book.spine.get(item.href);
@@ -208,8 +213,10 @@ function highlightAndScrollToc(href) {
   const savedScroll = sessionStorage.getItem('tocScroll_' + currentBookId);
 
   if (savedScroll !== null) {
+    // Restore the position recorded exactly when the element was clicked
     tocContainer.scrollTop = parseInt(savedScroll, 10);
   } else if (selectedElement) {
+    // Only runs on the very first fresh load when nothing was clicked yet
     selectedElement.scrollIntoView({ block: 'nearest' });
     sessionStorage.setItem('tocScroll_' + currentBookId, tocContainer.scrollTop);
   }
@@ -279,7 +286,7 @@ function chunkText(ignoreExtras = false) {
 
     // Mobile/Pointer hold logic for individual chunk buttons
     copyBtn.addEventListener('pointerdown', function(e) {
-      if(e.button !== 0 && e.type !== 'touchstart') return; // Ignore right clicks
+      if(e.button !== 0 && e.type !== 'touchstart') return; 
       isChunkLongPress = false;
 
       chunkPressTimer = setTimeout(() => {
@@ -295,12 +302,12 @@ function chunkText(ignoreExtras = false) {
     copyBtn.addEventListener('pointerup', () => clearTimeout(chunkPressTimer));
     copyBtn.addEventListener('pointerleave', () => clearTimeout(chunkPressTimer));
     copyBtn.addEventListener('pointercancel', () => clearTimeout(chunkPressTimer));
-    copyBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent mobile menu pop-up
+    copyBtn.addEventListener('contextmenu', (e) => e.preventDefault()); 
 
     copyBtn.addEventListener('click', function() {
       if (!isChunkLongPress) {
         copyToClipboard(finalChunk);
-        updateButtonState(this, false); // false = normal green
+        updateButtonState(this, false); 
       }
     });
 
@@ -369,14 +376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   splitBtn.addEventListener('pointerup', () => clearTimeout(pressTimer));
   splitBtn.addEventListener('click', () => { if (!isLongPress) chunkText(false); });
 
-  let scrollTimeout;
-  document.getElementById('tocContainer').addEventListener('scroll', (e) => {
-    if (!currentBookId) return;
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-      sessionStorage.setItem('tocScroll_' + currentBookId, e.target.scrollTop);
-    }, 100);
-  }, { passive: true });
+  // Note: The global TOC scroll listener has been completely removed to fix your issue
 
   loadFromHash();
   window.addEventListener('hashchange', loadFromHash);
