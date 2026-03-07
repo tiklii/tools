@@ -67,7 +67,7 @@ h1 {
   font-weight: bold;
   color: #555;
   border-bottom: 1px solid #eee;
-  background-color: #f8f9fa;
+  background-color: rgba(0, 0, 0, 0.03);
   margin: 0;
 }
 
@@ -88,13 +88,16 @@ h1 {
   font-size: 16px; 
   cursor: pointer;
   border-bottom: 1px solid #eee;
-  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
-  background-color: #fff;
-  color: #333;
+  background-color: transparent; 
+  color: inherit; 
+  outline: none;
 }
 
-.toc-label:hover {
-  background-color: #f1f3f5;
+/* Hover is wrapped to prevent touch devices from triggering a brief hover flash */
+@media (hover: hover) and (pointer: fine) {
+  .toc-label:hover {
+    background-color: rgba(0, 0, 0, 0.05); 
+  }
 }
 
 .toc-label.selected {
