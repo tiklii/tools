@@ -22,7 +22,7 @@ h1 {
 }
 
 #epubInput {
-display: none; /* Hide default input entirely */
+  display: none;
 }
 
 .custom-file-upload {
@@ -52,13 +52,13 @@ display: none; /* Hide default input entirely */
 
 /* TOC Container */
 #tocContainer {
-margin-bottom: 20px;
-max-height: 350px;
-overflow-y: auto;
-border: 1px solid #dcdcdc;
-border-radius: 8px;
-background-color: #ffffff;
-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  max-height: 350px;
+  overflow-y: auto;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .toc-header {
@@ -72,20 +72,20 @@ box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 #tocContainer ul {
-padding: 0;
-margin: 0;
-list-style: none;
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
 #tocContainer li {
-margin: 0;
-padding: 0;
+  margin: 0;
+  padding: 0;
 }
 
 /* Clickable TOC Label Area */
 .toc-label {
-  padding: 14px 18px; /* Bigger targets */
-  font-size: 16px; /* Bigger text */
+  padding: 14px 18px;
+  font-size: 16px; 
   cursor: pointer;
   border-bottom: 1px solid #eee;
   transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
@@ -103,15 +103,14 @@ padding: 0;
   font-weight: 600;
 }
 
-/* Sub-list indentation handles spacing, preventing parent-clicks */
+/* Sub-list indentation */
 #tocContainer ul ul .toc-label { padding-left: 36px; }
 #tocContainer ul ul ul .toc-label { padding-left: 54px; }
 #tocContainer ul ul ul ul .toc-label { padding-left: 72px; }
 
-/* Remove bottom border on the very last item */
 #tocContainer > ul > li:last-child > .toc-label,
 #tocContainer > ul > li:last-child > ul > li:last-child > .toc-label {
-border-bottom: none;
+  border-bottom: none;
 }
 
 /* Textareas and Controls */
@@ -119,7 +118,7 @@ textarea {
   width: calc(100% - 22px);
   height: 150px;
   padding: 10px;
-  font-size: 15px; /* Slightly larger reading text */
+  font-size: 15px; 
   line-height: 1.6;
   resize: vertical;
   overflow-y: auto;
@@ -137,9 +136,9 @@ textarea {
 }
 
 #charCount {
-font-size: 14px;
-color: #555;
-text-align: right;
+  font-size: 14px;
+  color: #555;
+  text-align: right;
 }
 
 .input-container {
@@ -173,6 +172,7 @@ text-align: right;
   font-size: 15px;
 }
 
+/* Buttons */
 .copy-button {
   padding: 8px 14px;
   background-color: #007BFF;
@@ -184,14 +184,24 @@ text-align: right;
   align-items: center;
   transition: background-color 0.2s ease;
   font-size: 14px;
+  /* Prevent system text selection UI when long pressing */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .copy-button:hover {
   background-color: #0056b3;
 }
 
+/* Normal Click State */
 .copy-button.green {
   background-color: #28a745;
+}
+
+/* Long Press State */
+.copy-button.dark-green {
+  background-color: #145523;
 }
 
 .copy-button .tick {
@@ -200,29 +210,31 @@ text-align: right;
   font-size: 16px;
 }
 
-.copy-button.green .tick {
+.copy-button.green .tick,
+.copy-button.dark-green .tick {
   display: inline-block;
 }
 
 #splitButton {
-padding: 14px 28px;
-background-color: #28a745;
-color: white;
-border: none;
-border-radius: 4px;
-cursor: pointer;
-font-size: 16px;
-font-weight: 600;
-margin-top: 10px;
-transition: background-color 0.2s ease;
-user-select: none;
--webkit-user-select: none;
+  padding: 14px 28px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 10px;
+  transition: background-color 0.2s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 #splitButton:hover {
-background-color: #218838;
+  background-color: #218838;
 }
 
 #chunkedTextContainer {
-margin-top: 30px;
+  margin-top: 30px;
 }

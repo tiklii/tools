@@ -138,7 +138,7 @@ async function loadChapterContent(href) {
     document.getElementById('chapterContent').value = originalText;
 
     const copyBtn = document.getElementById('copyChapterButton');
-    copyBtn.classList.remove('green');
+    copyBtn.classList.remove('green', 'dark-green');
     copyBtn.querySelector('.tick').style.display = 'none';
     if (lastClickedButton === copyBtn) lastClickedButton = null;
 
@@ -157,7 +157,6 @@ function renderToc(toc, bookId) {
     items.forEach(item => {
       const li = document.createElement('li');
 
-      // Decouple the clickable label from the list item wrapper
       const labelDiv = document.createElement('div');
       labelDiv.className = 'toc-label';
       labelDiv.textContent = item.label.trim();
@@ -274,10 +273,37 @@ function chunkText(ignoreExtras = false) {
     div.className = 'chunk-container';
     div.innerHTML = `<div class="chunk-title">Part ${partNumber}</div><textarea readonly>${finalChunk}</textarea><button class="copy-button">Copy to Clipboard<span class="tick">✔️</span></button>`;
 
-    div.querySelector('button').addEventListener('click', function() {
-      copyToClipboard(finalChunk);
-      updateButtonState(this);
+    const copyBtn = div.querySelector('button');
+    let chunkPressTimer;
+    let isChunkLongPress = false;
+
+    // Mobile/Pointer hold logic for individual chunk buttons
+    copyBtn.addEventListener('pointerdown', function(e) {
+      if(e.button !== 0 && e.type !== 'touchstart') return; // Ignore right clicks
+      isChunkLongPress = false;
+
+      chunkPressTimer = setTimeout(() => {
+        isChunkLongPress = true;
+        let holdTranslatedText = `Translate to English (Part ${partNumber} of ${chunks.length}):\n\n${finalChunk}`;
+        //let holdTranslatedText = `Translate to English:\n${cName} (Part ${partNumber} of ${chunks.length})\n\n${finalChunk}`;
+        copyToClipboard(holdTranslatedText);
+        updateButtonState(copyBtn, true); // true = dark green
+        if (navigator.vibrate) navigator.vibrate(50); // Optional subtle vibration on Android
+      }, 500); // 500ms hold
     });
+
+    copyBtn.addEventListener('pointerup', () => clearTimeout(chunkPressTimer));
+    copyBtn.addEventListener('pointerleave', () => clearTimeout(chunkPressTimer));
+    copyBtn.addEventListener('pointercancel', () => clearTimeout(chunkPressTimer));
+    copyBtn.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent mobile menu pop-up
+
+    copyBtn.addEventListener('click', function() {
+      if (!isChunkLongPress) {
+        copyToClipboard(finalChunk);
+        updateButtonState(this, false); // false = normal green
+      }
+    });
+
     fragment.appendChild(div);
   });
   container.appendChild(fragment);
@@ -292,12 +318,16 @@ function copyToClipboard(text) {
   document.body.removeChild(el);
 }
 
-function updateButtonState(button) {
+function updateButtonState(button, isDark = false) {
   if (lastClickedButton && lastClickedButton !== button) {
-    lastClickedButton.classList.remove('green');
+    lastClickedButton.classList.remove('green', 'dark-green');
     lastClickedButton.querySelector('.tick').style.display = 'none';
   }
-  button.classList.add('green');
+  // Clear any existing state on current button
+  button.classList.remove('green', 'dark-green');
+
+  // Apply new state
+  button.classList.add(isDark ? 'dark-green' : 'green');
   button.querySelector('.tick').style.display = 'inline-block';
   lastClickedButton = button;
 }
@@ -323,9 +353,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('chapterContent').addEventListener('input', updateCharCount);
+
+  // Global Copy Chapter Button
   document.getElementById('copyChapterButton').addEventListener('click', function() {
     copyToClipboard(document.getElementById('chapterContent').value);
-    updateButtonState(this);
+    updateButtonState(this, false);
   });
 
   const splitBtn = document.getElementById('splitButton');
