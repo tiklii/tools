@@ -1,206 +1,176 @@
-let book;
+let book = null;
+let currentBookId = null; // Track current loaded book to prevent re-parsing
 let lastClickedButton = null;
 let originalText = null;
 const dbName = "epubChunkerDB";
-const dbVersion = 3;
+const dbVersion = 4;
 const epubStoreName = "epubs";
-const usageCounterKey = 'epubUsageCounter';
-const sessionKey = 'currentFileKey'; // Generic key for sessionStorage
 
-function createUniqueFileKey(file) {
-  return `${file.name.toLowerCase()}_${file.lastModified}`;
-}
-
-// --- Helper functions for Reference Counting (Unchanged) ---
-function getUsageCounter() {
-  try {
-    const counter = localStorage.getItem(usageCounterKey);
-    return counter ? JSON.parse(counter) : {};
-  } catch (e) {
-    console.error("Could not parse usage counter, resetting.", e);
-    return {};
-  }
-}
-
-function setUsageCounter(counter) {
-  localStorage.setItem(usageCounterKey, JSON.stringify(counter));
-}
-
-function incrementEpubUsage(uniqueKey) {
-  if (!uniqueKey) return;
-  const counter = getUsageCounter();
-  counter[uniqueKey] = (counter[uniqueKey] || 0) + 1;
-  setUsageCounter(counter);
-  console.log(`Usage count for ${uniqueKey} is now ${counter[uniqueKey]}`);
-}
-
-function decrementEpubUsage(uniqueKey) {
-  if (!uniqueKey) return;
-  const counter = getUsageCounter();
-  if (counter.hasOwnProperty(uniqueKey)) {
-    counter[uniqueKey] = Math.max(0, counter[uniqueKey] - 1);
-    console.log(`Decremented usage count for ${uniqueKey} to ${counter[uniqueKey]}`);
-  }
-  setUsageCounter(counter);
-}
-
-
-// --- Generic IndexedDB Functions ---
+// --- Database Logic ---
 
 async function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(dbName, dbVersion);
-
     request.onupgradeneeded = function(event) {
       const db = event.target.result;
       if (db.objectStoreNames.contains(epubStoreName)) {
         db.deleteObjectStore(epubStoreName);
       }
-      db.createObjectStore(epubStoreName, {
-        keyPath: "uniqueKey"
-      });
+      const store = db.createObjectStore(epubStoreName, { keyPath: "bookId" });
+      store.createIndex("lastAccessed", "lastAccessed", { unique: false });
     };
-
-    request.onsuccess = function(event) {
-      resolve(event.target.result);
-    };
-
-    request.onerror = function(event) {
-      reject("Error opening database: " + event.target.errorCode);
-    };
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject("DB Error: " + event.target.errorCode);
   });
 }
 
 async function storeFileInDB(file) {
   const db = await openDatabase();
-  const transaction = db.transaction([epubStoreName], "readwrite");
-  const store = transaction.objectStore(epubStoreName);
-  const uniqueKey = createUniqueFileKey(file);
+  const bookId = Math.floor(1000 + Math.random() * 9000).toString();
   const data = {
-    uniqueKey: uniqueKey,
+    bookId: bookId,
     fileName: file.name,
     blob: file,
-    timestamp: new Date()
+    lastAccessed: Date.now()
   };
-  const request = store.put(data);
   return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    const transaction = db.transaction([epubStoreName], "readwrite");
+    const store = transaction.objectStore(epubStoreName);
+    store.put(data);
+    transaction.oncomplete = () => resolve(bookId);
+    transaction.onerror = () => reject(transaction.error);
   });
 }
 
-async function getFileRecordFromDB(uniqueKey) {
+async function getFileRecord(bookId) {
   const db = await openDatabase();
-  const transaction = db.transaction([epubStoreName], "readonly");
-  const store = transaction.objectStore(epubStoreName);
-  const request = store.get(uniqueKey);
   return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function deleteFileFromDB(uniqueKey) {
-  const db = await openDatabase();
-  const transaction = db.transaction([epubStoreName], "readwrite");
-  const store = transaction.objectStore(epubStoreName);
-  const request = store.delete(uniqueKey);
-  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([epubStoreName], "readwrite");
+    const store = transaction.objectStore(epubStoreName);
+    const request = store.get(bookId);
     request.onsuccess = () => {
-      console.log(`Successfully deleted orphan file "${uniqueKey}" from IndexedDB.`);
-      resolve();
+      if (request.result) {
+        request.result.lastAccessed = Date.now(); // Update activity
+        store.put(request.result);
+      }
+      resolve(request.result);
     };
     request.onerror = () => reject(request.error);
   });
 }
 
-async function cleanupOrphanedFiles() {
-  console.log("Running startup cleanup for orphaned files...");
-  const counter = getUsageCounter();
-  const keysToDelete = [];
-  for (const key in counter) {
-    if (counter.hasOwnProperty(key) && counter[key] <= 0) {
-      keysToDelete.push(key);
+async function cleanupOldFiles() {
+  const db = await openDatabase();
+  const fifteenDaysInMs = 15 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - fifteenDaysInMs;
+
+  const transaction = db.transaction([epubStoreName], "readwrite");
+  const store = transaction.objectStore(epubStoreName);
+  const index = store.index("lastAccessed");
+  const request = index.openCursor(IDBKeyRange.upperBound(cutoff));
+
+  request.onsuccess = (event) => {
+    const cursor = event.target.result;
+    if (cursor) {
+      console.log("Deleting expired EPUB:", cursor.value.bookId);
+      store.delete(cursor.primaryKey);
+      cursor.continue();
     }
-  }
-  if (keysToDelete.length > 0) {
-    console.log("Found orphans to delete:", keysToDelete);
-    for (const key of keysToDelete) {
-      await deleteFileFromDB(key);
-      delete counter[key];
-    }
-    setUsageCounter(counter);
-  } else {
-    console.log("No orphaned files found.");
-  }
+  };
 }
 
-// --- UI and Utility Functions ---
+// --- Navigation & State ---
 
-function updateButtonState(button) {
-  if (lastClickedButton && lastClickedButton !== button) {
-    lastClickedButton.classList.remove('green');
-    lastClickedButton.querySelector('.tick').style.display = 'none';
-  }
-  button.classList.add('green');
-  button.querySelector('.tick').style.display = 'inline-block';
-  lastClickedButton = button;
+function getHashState() {
+  const hash = window.location.hash.replace('#/', '');
+  const parts = hash.split('/');
+  return { bookId: parts[0] || null, spineIndex: parseInt(parts[1], 10) || 0 };
 }
 
-function updateCharCount() {
-  const text = document.getElementById('chapterContent').value;
-  document.getElementById('charCount').textContent = `Total characters: ${text.length}`;
+function updateHash(bookId, spineIndex) {
+  window.location.hash = `#/${bookId}/${spineIndex}`;
+}
+
+// --- UI Logic ---
+
+async function loadFromHash() {
+  const { bookId, spineIndex } = getHashState();
+  if (!bookId) return;
+
+  // Only read from DB and parse EPUB if we switched books or it's a fresh page load
+  if (currentBookId !== bookId || !book) {
+    const record = await getFileRecord(bookId);
+    if (!record) {
+      console.error("Book not found in storage.");
+      return;
+    }
+
+    currentBookId = bookId;
+
+    if (record.fileName.endsWith('.epub')) {
+      book = ePub(record.blob);
+      const navigation = await book.loaded.navigation;
+      renderToc(navigation.toc, bookId);
+    } else {
+      originalText = await record.blob.text();
+      document.getElementById('chapterContent').value = originalText;
+      formatText();
+      return; // Stop here for txt files
+    }
+  }
+
+  // If book is loaded, extract text based on the spine index in the URL
+  if (book) {
+    const section = book.spine.get(spineIndex);
+    if (section) {
+      await loadChapterContent(section.href);
+      highlightAndScrollToc(section.href);
+    }
+  }
 }
 
 async function loadChapterContent(href) {
   try {
-    const chapter = await book.load(href);
-    originalText = extractText(chapter);
+    const chapterDoc = await book.load(href);
+    originalText = chapterDoc.body.innerText.trim();
     document.getElementById('chapterContent').value = originalText;
+
+    // Reset copy button when a new chapter loads
+    const copyBtn = document.getElementById('copyChapterButton');
+    copyBtn.classList.remove('green');
+    copyBtn.querySelector('.tick').style.display = 'none';
+    if (lastClickedButton === copyBtn) lastClickedButton = null;
+
     formatText();
     updateCharCount();
   } catch (error) {
-    console.error("Error loading chapter content:", error);
+    console.error("Error loading chapter:", error);
   }
 }
 
-async function loadChapterAndSaveState(event) {
-  event.stopPropagation(); // PREVENT PARENT CLICKS
-
-  // RESET COPY BUTTON STATE
-  const copyBtn = document.getElementById('copyChapterButton');
-  copyBtn.classList.remove('green');
-  copyBtn.querySelector('.tick').style.display = 'none';
-  if (lastClickedButton === copyBtn) lastClickedButton = null;
-
-  const tocListItems = document.querySelectorAll('#tocList li');
-  tocListItems.forEach(item => item.classList.remove('selected'));
-  event.target.classList.add('selected');
-
-  const selectedHref = event.target.dataset.href;
-  const tocContainer = document.getElementById('tocContainer');
-
-  sessionStorage.setItem('currentChapterHref', selectedHref);
-  sessionStorage.setItem('currentTocScrollTop', tocContainer.scrollTop);
-
-  await loadChapterContent(selectedHref);
-}
-
-function extractText(chapterDocument) {
-  return chapterDocument.body.innerText.trim();
-}
-
-function renderToc(toc) {
+function renderToc(toc, bookId) {
   const tocList = document.getElementById('tocList');
   tocList.innerHTML = '';
+
   function addTocItems(items, parentElement) {
     items.forEach(item => {
       const li = document.createElement('li');
       li.textContent = item.label.trim();
       li.dataset.href = item.href;
-      li.addEventListener('click', loadChapterAndSaveState);
+
+      li.addEventListener('click', (e) => {
+        e.stopPropagation();
+        let spineIndex = 0;
+        // Ask epub.js for the exact spine index of this href
+        if (book && book.spine) {
+          const section = book.spine.get(item.href);
+          if (section) spineIndex = section.index;
+        }
+        updateHash(bookId, spineIndex);
+      });
+
       parentElement.appendChild(li);
-      if (item.subitems && item.subitems.length > 0) {
+      if (item.subitems?.length > 0) {
         const ul = document.createElement('ul');
         addTocItems(item.subitems, ul);
         li.appendChild(ul);
@@ -210,38 +180,50 @@ function renderToc(toc) {
   addTocItems(toc, tocList);
 }
 
-function restoreTocState() {
-  const currentChapterHref = sessionStorage.getItem('currentChapterHref');
-  const tocScrollTop = sessionStorage.getItem('currentTocScrollTop');
-  const tocContainer = document.getElementById('tocContainer');
+function highlightAndScrollToc(href) {
+  let selectedElement = null;
+  const items = document.querySelectorAll('#tocList li');
 
-  if (currentChapterHref) {
-    const tocListItems = document.querySelectorAll('#tocList li');
-    let selectedElement = null;
-    tocListItems.forEach(item => {
-      item.classList.remove('selected');
-      if (item.dataset.href === currentChapterHref) {
-        item.classList.add('selected');
-        selectedElement = item;
-      }
-    });
-    if (selectedElement) {
-      setTimeout(() => {
-        selectedElement.scrollIntoView({
-          block: 'nearest'
-        });
-      }, 50);
+  items.forEach(li => {
+    li.classList.remove('selected');
+    if (li.dataset.href === href) {
+      li.classList.add('selected');
+      selectedElement = li;
     }
-  }
-  if (tocScrollTop !== null) {
-    tocContainer.scrollTop = parseInt(tocScrollTop, 10);
+  });
+
+  if (selectedElement) {
+    // Slight delay ensures the DOM is painted before scrolling
+    setTimeout(() => {
+      selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }, 50);
   }
 }
+
+function updateCharCount() {
+  const text = document.getElementById('chapterContent').value;
+  document.getElementById('charCount').textContent = `Total characters: ${text.length}`;
+}
+
+function formatText() {
+  const formatSelect = document.getElementById('formatSelect');
+  const textArea = document.getElementById('chapterContent');
+  if (originalText === null && textArea.value) originalText = textArea.value;
+
+  if (formatSelect.value === 'pretty' && originalText) {
+    const paragraphs = originalText.split('\n');
+    textArea.value = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
+  } else if (originalText) {
+    textArea.value = originalText;
+  }
+  updateCharCount();
+}
+
+// --- Chunking Logic ---
 
 function chunkText(ignoreExtras = false) {
   const text = document.getElementById('chapterContent').value;
   const maxChars = parseInt(document.getElementById('maxChars').value);
-
   let addToTop = ignoreExtras ? "" : document.getElementById('addToTop').value.trim();
   let addToBottom = ignoreExtras ? "" : document.getElementById('addToBottom').value.trim();
 
@@ -253,222 +235,111 @@ function chunkText(ignoreExtras = false) {
     if ((currentChunk.length + paragraphToAdd.length) <= maxChars) {
       currentChunk += paragraphToAdd;
     } else {
-      if (currentChunk.trim()) {
-        chunks.push(currentChunk.trim());
-      }
+      if (currentChunk.trim()) chunks.push(currentChunk.trim());
       currentChunk = paragraph;
     }
   }
-  if (currentChunk.trim()) {
-    chunks.push(currentChunk.trim());
-  }
-  const totalChunks = chunks.length;
-  const chunkedTextContainer = document.getElementById('chunkedTextContainer');
+  if (currentChunk.trim()) chunks.push(currentChunk.trim());
 
-  // Clear previous content
-  chunkedTextContainer.innerHTML = '';
-
-  // Use DocumentFragment to prevent browser layout thrashing
+  const container = document.getElementById('chunkedTextContainer');
+  container.innerHTML = '';
   const fragment = document.createDocumentFragment();
-  const digits = String(totalChunks).length;
+  const digits = String(chunks.length).length;
 
   chunks.forEach((chunk, index) => {
     const partNumber = String(index + 1).padStart(digits, '0');
-    let finalChunk = (addToTop.replace('$X', partNumber).replace('$Y', totalChunks) + '\n\n' + chunk + '\n\n' + addToBottom.replace('$X', partNumber).replace('$Y', totalChunks)).trim();
+    let finalChunk = (addToTop.replace('$X', partNumber).replace('$Y', chunks.length) + '\n\n' + chunk + '\n\n' + addToBottom.replace('$X', partNumber).replace('$Y', chunks.length)).trim();
 
-    const chunkContainer = document.createElement('div');
-    chunkContainer.classList.add('chunk-container');
+    const div = document.createElement('div');
+    div.className = 'chunk-container';
+    div.innerHTML = `<div class="chunk-title">Part ${partNumber}</div><textarea readonly>${finalChunk}</textarea><button class="copy-button">Copy to Clipboard<span class="tick">✔️</span></button>`;
 
-    const chunkTitle = document.createElement('div');
-    chunkTitle.classList.add('chunk-title');
-    chunkTitle.textContent = `Part ${partNumber}`;
-
-    const chunkTextarea = document.createElement('textarea');
-    chunkTextarea.value = finalChunk;
-    chunkTextarea.readOnly = true;
-
-    const copyButton = document.createElement('button');
-    copyButton.classList.add('copy-button');
-    copyButton.innerHTML = 'Copy to Clipboard<span class="tick">✔️</span>';
-    copyButton.addEventListener('click', function() {
-      copyToClipboard(chunkTextarea.value);
-      updateButtonState(copyButton);
+    div.querySelector('button').addEventListener('click', function() {
+      copyToClipboard(finalChunk);
+      updateButtonState(this);
     });
-
-    chunkContainer.appendChild(chunkTitle);
-    chunkContainer.appendChild(chunkTextarea);
-    chunkContainer.appendChild(copyButton);
-
-    // Add to fragment (off-screen)
-    fragment.appendChild(chunkContainer);
+    fragment.appendChild(div);
   });
-
-  // Render everything at once (on-screen)
-  chunkedTextContainer.appendChild(fragment);
+  container.appendChild(fragment);
 }
 
 function copyToClipboard(text) {
-  const hiddenInput = document.createElement('textarea');
-  hiddenInput.value = text;
-  document.body.appendChild(hiddenInput);
-  hiddenInput.select();
-  try {
-    document.execCommand('copy');
-  } catch (err) {
-    console.error('Copy to clipboard failed:', err);
-  }
-  document.body.removeChild(hiddenInput);
+  const el = document.createElement('textarea');
+  el.value = text;
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand('copy');
+  document.body.removeChild(el);
 }
 
-function formatText() {
-  const formatSelect = document.getElementById('formatSelect');
-  const textArea = document.getElementById('chapterContent');
-  if (originalText === null && textArea.value) {
-    originalText = textArea.value;
+function updateButtonState(button) {
+  if (lastClickedButton && lastClickedButton !== button) {
+    lastClickedButton.classList.remove('green');
+    lastClickedButton.querySelector('.tick').style.display = 'none';
   }
-  if (formatSelect.value === 'pretty' && originalText) {
-    const paragraphs = originalText.split('\n');
-    const formattedText = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
-    textArea.value = formattedText;
-  } else if (originalText) {
-    textArea.value = originalText;
-  }
-  updateCharCount();
+  button.classList.add('green');
+  button.querySelector('.tick').style.display = 'inline-block';
+  lastClickedButton = button;
 }
 
 // --- Event Listeners ---
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const currentFileKey = sessionStorage.getItem(sessionKey);
+  await cleanupOldFiles();
 
-  if (currentFileKey) {
-    incrementEpubUsage(currentFileKey);
-  }
-  await cleanupOrphanedFiles();
+  // Persistent settings setup
+  ['maxChars', 'addToTop', 'addToBottom'].forEach(id => {
+    const el = document.getElementById(id);
+    const saved = localStorage.getItem(id);
+    if (saved) el.value = saved;
+    el.addEventListener('input', () => localStorage.setItem(id, el.value));
+  });
 
-  // UI Setup
-  const maxCharsInput = document.getElementById('maxChars');
-  maxCharsInput.value = localStorage.getItem('maxChars') || '1800';
-  maxCharsInput.addEventListener('input', () => localStorage.setItem('maxChars', maxCharsInput.value));
-  const addToTopInput = document.getElementById('addToTop');
-  addToTopInput.value = localStorage.getItem('addToTop') || 'Translate to English (part $X of $Y):';
-  addToTopInput.addEventListener('input', () => localStorage.setItem('addToTop', addToTopInput.value));
-  const addToBottomInput = document.getElementById('addToBottom');
-  addToBottomInput.value = localStorage.getItem('addToBottom') || '';
-  addToBottomInput.addEventListener('input', () => localStorage.setItem('addToBottom', addToBottomInput.value));
+  // Specifically handle the select format default
   const formatSelect = document.getElementById('formatSelect');
-  formatSelect.value = localStorage.getItem('formatSelect') || 'pretty';
+  const savedFormat = localStorage.getItem('formatSelect');
+  formatSelect.value = savedFormat ? savedFormat : 'pretty'; // Explicit default
   formatSelect.addEventListener('change', () => {
     localStorage.setItem('formatSelect', formatSelect.value);
     formatText();
   });
+
   document.getElementById('chapterContent').addEventListener('input', updateCharCount);
   document.getElementById('copyChapterButton').addEventListener('click', function() {
-    const chapterText = document.getElementById('chapterContent').value;
-    copyToClipboard(chapterText);
+    copyToClipboard(document.getElementById('chapterContent').value);
     updateButtonState(this);
   });
 
-  // Split Button Hold Logic
+  // Long press split logic
   const splitBtn = document.getElementById('splitButton');
-  let pressTimer;
-  let isLongPress = false;
-
+  let pressTimer, isLongPress = false;
   splitBtn.addEventListener('pointerdown', () => {
     isLongPress = false;
-    pressTimer = window.setTimeout(() => {
-      isLongPress = true;
-      chunkText(true); // Split ignoring extras
-    }, 600); // 600ms threshold for "short hold"
+    pressTimer = setTimeout(() => { isLongPress = true; chunkText(true); }, 600);
   });
-
   splitBtn.addEventListener('pointerup', () => clearTimeout(pressTimer));
-  splitBtn.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+  splitBtn.addEventListener('click', () => { if (!isLongPress) chunkText(false); });
 
-  splitBtn.addEventListener('click', () => {
-    if (!isLongPress) {
-      chunkText(false); // Normal split
-    }
-  });
-
-
-  // File Restoration Logic
-  if (currentFileKey) {
-    try {
-      const record = await getFileRecordFromDB(currentFileKey);
-      if (!record) throw new Error("File not found in DB.");
-
-      if (record.fileName.endsWith('.epub')) {
-        book = ePub(record.blob);
-        const toc = await book.loaded.navigation;
-        renderToc(toc);
-        restoreTocState();
-        const lastChapter = sessionStorage.getItem('currentChapterHref');
-        if (lastChapter) {
-          await loadChapterContent(lastChapter);
-        }
-      } else if (record.fileName.endsWith('.txt') || record.fileName.endsWith('.md')) {
-        originalText = await record.blob.text();
-        document.getElementById('chapterContent').value = originalText;
-        formatText();
-      }
-
-    } catch (error) {
-      console.error("Error restoring file on startup:", error);
-      decrementEpubUsage(currentFileKey);
-      sessionStorage.clear();
-    }
-  }
-
-  updateCharCount();
+  // Load state from Hash
+  loadFromHash();
+  window.addEventListener('hashchange', loadFromHash);
 });
 
 document.getElementById('epubInput').addEventListener('change', async function(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  const oldFileKey = sessionStorage.getItem(sessionKey);
-  decrementEpubUsage(oldFileKey);
-  sessionStorage.clear();
-  document.getElementById('tocList').innerHTML = '';
-  document.getElementById('chapterContent').value = '';
-  originalText = null;
-  updateCharCount();
+  try {
+    const bookId = await storeFileInDB(file);
+    document.getElementById('tocList').innerHTML = ''; // Clear old TOC
+    document.getElementById('chapterContent').value = '';
 
-  const uniqueKey = createUniqueFileKey(file);
-  const fileType = file.name.toLowerCase();
-
-  if (fileType.endsWith('.epub') || fileType.endsWith('.txt') || fileType.endsWith('.md')) {
-    try {
-      await storeFileInDB(file);
-      sessionStorage.setItem(sessionKey, uniqueKey);
-      incrementEpubUsage(uniqueKey);
-
-      if (fileType.endsWith('.epub')) {
-        book = ePub(file);
-        const toc = await book.loaded.navigation;
-        renderToc(toc);
-      } else { // It's a .txt or .md file
-        originalText = await file.text();
-        document.getElementById('chapterContent').value = originalText;
-        formatText();
-        updateCharCount();
-      }
-
-    } catch (error) {
-      console.error("Error handling file input:", error);
-      decrementEpubUsage(uniqueKey);
-      sessionStorage.clear();
-      alert("Failed to load or store file. See console for details.");
-    }
-  } else {
-    alert("Unsupported file type. Please upload .epub, .txt, or .md files.");
+    // Jump to the newly uploaded book (Spine 0)
+    updateHash(bookId, 0);
+  } catch (error) {
+    console.error("Upload error:", error);
+    alert("Failed to store file.");
   }
-  // THE FIX: This line has been removed.
-  // event.target.value = '';
-});
-
-window.addEventListener('beforeunload', () => {
-  const currentFileKey = sessionStorage.getItem(sessionKey);
-  decrementEpubUsage(currentFileKey);
+  // Clear file input so the same file can be selected again if needed
+  event.target.value = '';
 });
