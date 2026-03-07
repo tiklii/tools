@@ -1,5 +1,6 @@
 let book = null;
-let currentBookId = null; // Track current loaded book to prevent re-parsing
+let currentBookId = null;
+let currentChapterName = "";
 let lastClickedButton = null;
 let originalText = null;
 const dbName = "epubChunkerDB";
@@ -50,7 +51,7 @@ async function getFileRecord(bookId) {
     const request = store.get(bookId);
     request.onsuccess = () => {
       if (request.result) {
-        request.result.lastAccessed = Date.now(); // Update activity
+        request.result.lastAccessed = Date.now();
         store.put(request.result);
       }
       resolve(request.result);
@@ -97,15 +98,16 @@ async function loadFromHash() {
   const { bookId, spineIndex } = getHashState();
   if (!bookId) return;
 
-  // Only read from DB and parse EPUB if we switched books or it's a fresh page load
   if (currentBookId !== bookId || !book) {
     const record = await getFileRecord(bookId);
     if (!record) {
       console.error("Book not found in storage.");
+      document.getElementById('fileNameDisplay').textContent = "File missing or expired";
       return;
     }
 
     currentBookId = bookId;
+    document.getElementById('fileNameDisplay').textContent = "Loaded: " + record.fileName;
 
     if (record.fileName.endsWith('.epub')) {
       book = ePub(record.blob);
@@ -113,13 +115,13 @@ async function loadFromHash() {
       renderToc(navigation.toc, bookId);
     } else {
       originalText = await record.blob.text();
+      currentChapterName = record.fileName.replace(/\.[^/.]+$/, "");
       document.getElementById('chapterContent').value = originalText;
       formatText();
-      return; // Stop here for txt files
+      return;
     }
   }
 
-  // If book is loaded, extract text based on the spine index in the URL
   if (book) {
     const section = book.spine.get(spineIndex);
     if (section) {
@@ -135,7 +137,6 @@ async function loadChapterContent(href) {
     originalText = chapterDoc.body.innerText.trim();
     document.getElementById('chapterContent').value = originalText;
 
-    // Reset copy button when a new chapter loads
     const copyBtn = document.getElementById('copyChapterButton');
     copyBtn.classList.remove('green');
     copyBtn.querySelector('.tick').style.display = 'none';
@@ -155,13 +156,17 @@ function renderToc(toc, bookId) {
   function addTocItems(items, parentElement) {
     items.forEach(item => {
       const li = document.createElement('li');
-      li.textContent = item.label.trim();
-      li.dataset.href = item.href;
 
-      li.addEventListener('click', (e) => {
+      // Decouple the clickable label from the list item wrapper
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'toc-label';
+      labelDiv.textContent = item.label.trim();
+      labelDiv.dataset.href = item.href;
+      labelDiv.dataset.label = item.label.trim();
+
+      labelDiv.addEventListener('click', (e) => {
         e.stopPropagation();
         let spineIndex = 0;
-        // Ask epub.js for the exact spine index of this href
         if (book && book.spine) {
           const section = book.spine.get(item.href);
           if (section) spineIndex = section.index;
@@ -169,7 +174,9 @@ function renderToc(toc, bookId) {
         updateHash(bookId, spineIndex);
       });
 
+      li.appendChild(labelDiv);
       parentElement.appendChild(li);
+
       if (item.subitems?.length > 0) {
         const ul = document.createElement('ul');
         addTocItems(item.subitems, ul);
@@ -181,22 +188,31 @@ function renderToc(toc, bookId) {
 }
 
 function highlightAndScrollToc(href) {
-  let selectedElement = null;
-  const items = document.querySelectorAll('#tocList li');
+  const items = Array.from(document.querySelectorAll('.toc-label'));
+  let selectedElement = items.find(el => el.dataset.href === href);
 
-  items.forEach(li => {
-    li.classList.remove('selected');
-    if (li.dataset.href === href) {
-      li.classList.add('selected');
-      selectedElement = li;
-    }
-  });
+  if (!selectedElement) {
+    const baseHref = href.split('#')[0];
+    selectedElement = items.find(el => el.dataset.href.split('#')[0] === baseHref);
+  }
+
+  items.forEach(el => el.classList.remove('selected'));
 
   if (selectedElement) {
-    // Slight delay ensures the DOM is painted before scrolling
-    setTimeout(() => {
-      selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }, 50);
+    selectedElement.classList.add('selected');
+    currentChapterName = selectedElement.dataset.label || "";
+  } else {
+    currentChapterName = "";
+  }
+
+  const tocContainer = document.getElementById('tocContainer');
+  const savedScroll = sessionStorage.getItem('tocScroll_' + currentBookId);
+
+  if (savedScroll !== null) {
+    tocContainer.scrollTop = parseInt(savedScroll, 10);
+  } else if (selectedElement) {
+    selectedElement.scrollIntoView({ block: 'nearest' });
+    sessionStorage.setItem('tocScroll_' + currentBookId, tocContainer.scrollTop);
   }
 }
 
@@ -245,10 +261,14 @@ function chunkText(ignoreExtras = false) {
   container.innerHTML = '';
   const fragment = document.createDocumentFragment();
   const digits = String(chunks.length).length;
+  const cName = currentChapterName || "";
 
   chunks.forEach((chunk, index) => {
     const partNumber = String(index + 1).padStart(digits, '0');
-    let finalChunk = (addToTop.replace('$X', partNumber).replace('$Y', chunks.length) + '\n\n' + chunk + '\n\n' + addToBottom.replace('$X', partNumber).replace('$Y', chunks.length)).trim();
+
+    let topText = addToTop.replaceAll('$X', partNumber).replaceAll('$Y', chunks.length).replaceAll('$Z', cName);
+    let bottomText = addToBottom.replaceAll('$X', partNumber).replaceAll('$Y', chunks.length).replaceAll('$Z', cName);
+    let finalChunk = (topText + '\n\n' + chunk + '\n\n' + bottomText).trim();
 
     const div = document.createElement('div');
     div.className = 'chunk-container';
@@ -287,7 +307,6 @@ function updateButtonState(button) {
 document.addEventListener('DOMContentLoaded', async () => {
   await cleanupOldFiles();
 
-  // Persistent settings setup
   ['maxChars', 'addToTop', 'addToBottom'].forEach(id => {
     const el = document.getElementById(id);
     const saved = localStorage.getItem(id);
@@ -295,10 +314,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.addEventListener('input', () => localStorage.setItem(id, el.value));
   });
 
-  // Specifically handle the select format default
   const formatSelect = document.getElementById('formatSelect');
   const savedFormat = localStorage.getItem('formatSelect');
-  formatSelect.value = savedFormat ? savedFormat : 'pretty'; // Explicit default
+  formatSelect.value = savedFormat ? savedFormat : 'pretty';
   formatSelect.addEventListener('change', () => {
     localStorage.setItem('formatSelect', formatSelect.value);
     formatText();
@@ -310,7 +328,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateButtonState(this);
   });
 
-  // Long press split logic
   const splitBtn = document.getElementById('splitButton');
   let pressTimer, isLongPress = false;
   splitBtn.addEventListener('pointerdown', () => {
@@ -320,7 +337,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   splitBtn.addEventListener('pointerup', () => clearTimeout(pressTimer));
   splitBtn.addEventListener('click', () => { if (!isLongPress) chunkText(false); });
 
-  // Load state from Hash
+  let scrollTimeout;
+  document.getElementById('tocContainer').addEventListener('scroll', (e) => {
+    if (!currentBookId) return;
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      sessionStorage.setItem('tocScroll_' + currentBookId, e.target.scrollTop);
+    }, 100);
+  }, { passive: true });
+
   loadFromHash();
   window.addEventListener('hashchange', loadFromHash);
 });
@@ -330,16 +355,16 @@ document.getElementById('epubInput').addEventListener('change', async function(e
   if (!file) return;
 
   try {
+    document.getElementById('fileNameDisplay').textContent = "Loading...";
     const bookId = await storeFileInDB(file);
-    document.getElementById('tocList').innerHTML = ''; // Clear old TOC
+
+    document.getElementById('tocList').innerHTML = '';
     document.getElementById('chapterContent').value = '';
 
-    // Jump to the newly uploaded book (Spine 0)
     updateHash(bookId, 0);
   } catch (error) {
     console.error("Upload error:", error);
-    alert("Failed to store file.");
+    document.getElementById('fileNameDisplay').textContent = "Failed to load file.";
   }
-  // Clear file input so the same file can be selected again if needed
   event.target.value = '';
 });
