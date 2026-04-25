@@ -97,7 +97,7 @@ function updateHash(bookId, spineIndex) {
 async function loadFromHash() {
   const { bookId, spineIndex } = getHashState();
   if (!bookId) {
-    document.title = "EPUB Text Chunker"; // Revert to default if no file
+    document.title = "EPUB Text Chunker";
     return;
   }
 
@@ -106,14 +106,14 @@ async function loadFromHash() {
     if (!record) {
       console.error("Book not found in storage.");
       document.getElementById('fileNameDisplay').textContent = "File missing or expired";
-      document.title = "EPUB Text Chunker"; // Revert to default if failed
+      document.title = "EPUB Text Chunker";
       return;
     }
 
     currentBookId = bookId;
     document.getElementById('fileNameDisplay').textContent = "Loaded: " + record.fileName;
 
-    // Update the browser tab/title tag with the loaded file name
+    // Update the browser tab/title tag
     document.title = record.fileName + " - Split";
 
     if (record.fileName.endsWith('.epub')) {
@@ -123,8 +123,12 @@ async function loadFromHash() {
     } else {
       originalText = await record.blob.text();
       currentChapterName = record.fileName.replace(/\.[^/.]+$/, "");
-      document.getElementById('chapterContent').value = originalText;
+      const textArea = document.getElementById('chapterContent');
+      textArea.value = originalText;
       formatText();
+
+      // Reset scroll to top for TXT/MD loads
+      textArea.scrollTop = 0;
       return;
     }
   }
@@ -142,7 +146,8 @@ async function loadChapterContent(href) {
   try {
     const chapterDoc = await book.load(href);
     originalText = chapterDoc.body.innerText.trim();
-    document.getElementById('chapterContent').value = originalText;
+    const textArea = document.getElementById('chapterContent');
+    textArea.value = originalText;
 
     const copyBtn = document.getElementById('copyChapterButton');
     copyBtn.classList.remove('green', 'dark-green');
@@ -151,6 +156,9 @@ async function loadChapterContent(href) {
 
     formatText();
     updateCharCount();
+
+    // Reset preview box scroll position to top whenever a new chapter loads
+    textArea.scrollTop = 0;
   } catch (error) {
     console.error("Error loading chapter:", error);
   }
@@ -173,7 +181,6 @@ function renderToc(toc, bookId) {
       labelDiv.addEventListener('click', (e) => {
         e.stopPropagation();
 
-        // Save the EXACT scroll Y-coordinate at the moment of selection
         const tocContainer = document.getElementById('tocContainer');
         sessionStorage.setItem('tocScroll_' + bookId, tocContainer.scrollTop);
 
@@ -220,10 +227,8 @@ function highlightAndScrollToc(href) {
   const savedScroll = sessionStorage.getItem('tocScroll_' + currentBookId);
 
   if (savedScroll !== null) {
-    // Restore the position recorded exactly when the element was clicked
     tocContainer.scrollTop = parseInt(savedScroll, 10);
   } else if (selectedElement) {
-    // Only runs on the very first fresh load when nothing was clicked yet
     selectedElement.scrollIntoView({ block: 'nearest' });
     sessionStorage.setItem('tocScroll_' + currentBookId, tocContainer.scrollTop);
   }
@@ -301,8 +306,8 @@ function chunkText(ignoreExtras = false) {
         let holdTranslatedText = `Translate to English (Part ${partNumber} of ${chunks.length}):\n\n${finalChunk}`;
         copyToClipboard(holdTranslatedText);
         updateButtonState(copyBtn, true); // true = dark green
-        if (navigator.vibrate) navigator.vibrate(50); // Optional subtle vibration on Android
-      }, 500); // 500ms hold
+        if (navigator.vibrate) navigator.vibrate(50);
+      }, 500);
     });
 
     copyBtn.addEventListener('pointerup', () => clearTimeout(chunkPressTimer));
