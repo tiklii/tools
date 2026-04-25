@@ -96,18 +96,25 @@ function updateHash(bookId, spineIndex) {
 
 async function loadFromHash() {
   const { bookId, spineIndex } = getHashState();
-  if (!bookId) return;
+  if (!bookId) {
+    document.title = "EPUB Text Chunker"; // Revert to default if no file
+    return;
+  }
 
   if (currentBookId !== bookId || !book) {
     const record = await getFileRecord(bookId);
     if (!record) {
       console.error("Book not found in storage.");
       document.getElementById('fileNameDisplay').textContent = "File missing or expired";
+      document.title = "EPUB Text Chunker"; // Revert to default if failed
       return;
     }
 
     currentBookId = bookId;
     document.getElementById('fileNameDisplay').textContent = "Loaded: " + record.fileName;
+
+    // Update the browser tab/title tag with the loaded file name
+    document.title = record.fileName + " - Split";
 
     if (record.fileName.endsWith('.epub')) {
       book = ePub(record.blob);
@@ -165,7 +172,7 @@ function renderToc(toc, bookId) {
 
       labelDiv.addEventListener('click', (e) => {
         e.stopPropagation();
-        
+
         // Save the EXACT scroll Y-coordinate at the moment of selection
         const tocContainer = document.getElementById('tocContainer');
         sessionStorage.setItem('tocScroll_' + bookId, tocContainer.scrollTop);
@@ -286,13 +293,12 @@ function chunkText(ignoreExtras = false) {
 
     // Mobile/Pointer hold logic for individual chunk buttons
     copyBtn.addEventListener('pointerdown', function(e) {
-      if(e.button !== 0 && e.type !== 'touchstart') return; 
+      if(e.button !== 0 && e.type !== 'touchstart') return;
       isChunkLongPress = false;
 
       chunkPressTimer = setTimeout(() => {
         isChunkLongPress = true;
         let holdTranslatedText = `Translate to English (Part ${partNumber} of ${chunks.length}):\n\n${finalChunk}`;
-        //let holdTranslatedText = `Translate to English:\n${cName} (Part ${partNumber} of ${chunks.length})\n\n${finalChunk}`;
         copyToClipboard(holdTranslatedText);
         updateButtonState(copyBtn, true); // true = dark green
         if (navigator.vibrate) navigator.vibrate(50); // Optional subtle vibration on Android
@@ -302,12 +308,12 @@ function chunkText(ignoreExtras = false) {
     copyBtn.addEventListener('pointerup', () => clearTimeout(chunkPressTimer));
     copyBtn.addEventListener('pointerleave', () => clearTimeout(chunkPressTimer));
     copyBtn.addEventListener('pointercancel', () => clearTimeout(chunkPressTimer));
-    copyBtn.addEventListener('contextmenu', (e) => e.preventDefault()); 
+    copyBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
     copyBtn.addEventListener('click', function() {
       if (!isChunkLongPress) {
         copyToClipboard(finalChunk);
-        updateButtonState(this, false); 
+        updateButtonState(this, false);
       }
     });
 
@@ -375,8 +381,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   splitBtn.addEventListener('pointerup', () => clearTimeout(pressTimer));
   splitBtn.addEventListener('click', () => { if (!isLongPress) chunkText(false); });
-
-  // Note: The global TOC scroll listener has been completely removed to fix your issue
 
   loadFromHash();
   window.addEventListener('hashchange', loadFromHash);
