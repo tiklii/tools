@@ -10,5 +10,10 @@
   },
   "devDependencies": {
     "vite": "^5.2.11"
+  },
+  "dependencies": {
+    "epubjs": "^0.3.93",
+    "html-prettify": "^1.0.7",
+    "jszip": "^3.10.1"
   }
 }

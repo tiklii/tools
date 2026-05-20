@@ -3,6 +3,7 @@ let currentBookId = null;
 let currentChapterName = "";
 let lastClickedButton = null;
 let originalText = null;
+let originalHtml = null;
 const dbName = "epubChunkerDB";
 const dbVersion = 4;
 const epubStoreName = "epubs";
@@ -146,6 +147,7 @@ async function loadChapterContent(href) {
   try {
     const chapterDoc = await book.load(href);
     originalText = chapterDoc.body.innerText.trim();
+    originalHtml = chapterDoc.body.innerHTML;
     const textArea = document.getElementById('chapterContent');
     textArea.value = originalText;
 
@@ -239,12 +241,99 @@ function updateCharCount() {
   document.getElementById('charCount').textContent = `Total characters: ${text.length}`;
 }
 
+// --- HTML Prettify Helpers ---
+function removeEmptyLines(nonFormattedString) {
+  return nonFormattedString.trim().replace(/(^(\s|\t)+|(( |\t)+)$)/gm, '');
+}
+
+function mergeAttributesWithElements(markup) {
+  const splittedMarkup = removeEmptyLines(markup).split('\n');
+  const mergedLines = [];
+  let currentElement = '';
+  for (let i = 0; i < splittedMarkup.length; i++) {
+    const line = splittedMarkup[i];
+
+    if (line.endsWith('/>')) {
+      mergedLines.push(`${currentElement}${line.slice(0, -2)} />`);
+      currentElement = '';
+      continue;
+    }
+
+    if (line.endsWith('>')) {
+      mergedLines.push(`${currentElement}${
+        line.startsWith('>') || line.startsWith('<') ? '' : ' '
+      }${line}`);
+      currentElement = '';
+      continue;
+    }
+
+    currentElement += currentElement.length ? ` ${line}` : line;
+  }
+
+  return mergedLines;
+}
+
+function addIndentation(splittedHtml, options = {}) {
+  const char = options.char || ' ';
+  const count = options.count || 2;
+
+  let level = 0;
+  const opened = [];
+
+  return splittedHtml.reverse().reduce((indented, elTag) => {
+    if (opened.length
+      && level
+      && opened[level]
+      && opened[level] === elTag.substring(1, opened[level].length + 1)
+    ) {
+      opened.splice(level, 1);
+      level--;
+    }
+
+    const indentation = char.repeat(level ? level * count : 0);
+
+    const newIndented = [
+      `${indentation}${elTag}`,
+      ...indented,
+    ];
+
+    if (elTag.substring(0, 2) === '</') {
+      level++;
+      opened[level] = elTag.substring(2, elTag.length - 1);
+    }
+
+    return newIndented;
+  }, []).join('\n');
+}
+
+function prettifyHTML(markup, options = {}) {
+  const splitted = mergeAttributesWithElements(markup);
+  return addIndentation(splitted, options);
+}
+
 function formatText() {
   const formatSelect = document.getElementById('formatSelect');
   const textArea = document.getElementById('chapterContent');
-  if (originalText === null && textArea.value) originalText = textArea.value;
+  if (originalText === null && textArea.value) {
+    originalText = textArea.value;
+    originalHtml = null;
+  }
 
-  if (formatSelect.value === 'pretty' && originalText) {
+  if (formatSelect.value === 'prettify-html') {
+    const htmlSource = originalHtml || (originalText && (originalText.includes('<') && originalText.includes('>')) ? originalText : null);
+    if (htmlSource) {
+      const preparedHtml = htmlSource.replace(/<\/(p|div|h[1-6]|li)>/gi, '$&\n');
+      const prettifiedHtml = prettifyHTML(preparedHtml);
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = prettifiedHtml;
+      const text = tempDiv.innerText;
+      const paragraphs = text.split('\n');
+      textArea.value = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
+    } else if (originalText) {
+      const paragraphs = originalText.split('\n');
+      textArea.value = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
+    }
+  } else if (formatSelect.value === 'clean' && originalText) {
     const paragraphs = originalText.split('\n');
     textArea.value = paragraphs.map(p => p.trim()).filter(p => p).join('\n\n');
   } else if (originalText) {
@@ -364,7 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const formatSelect = document.getElementById('formatSelect');
   const savedFormat = localStorage.getItem('formatSelect');
-  formatSelect.value = savedFormat ? savedFormat : 'pretty';
+  formatSelect.value = savedFormat ? savedFormat : 'clean';
   formatSelect.addEventListener('change', () => {
     localStorage.setItem('formatSelect', formatSelect.value);
     formatText();
