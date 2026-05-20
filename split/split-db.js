@@ -1,3 +1,5 @@
+import ePub from 'epubjs';
+
 let book = null;
 let currentBookId = null;
 let currentChapterName = "";

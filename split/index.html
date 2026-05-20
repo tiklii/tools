@@ -5,13 +5,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EPUB Text Chunker</title>
-  <script src="./script/jszip.min.js"></script>
-  <script src="./script/epub.min.js"></script>
-  <link rel="stylesheet" href="./split/style.css" />
+  <link rel="stylesheet" href="./style.css" />
 </head>
 
 <body>
-  <h1><a href="split.html">EPUB Text Chunker</a></h1>
+  <h1><a href="./">EPUB Text Chunker</a></h1>
 
   <div class="upload-container">
     <label for="epubInput" class="custom-file-upload">Choose EPUB / TXT File</label>
@@ -61,7 +59,7 @@
 
   <div id="chunkedTextContainer"></div>
 
-  <script src="./split/split-db.js"></script>
+  <script type="module" src="./split-db.js"></script>
 </body>
 
 </html>
