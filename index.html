@@ -1,13 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
 
-<h2>text splitter</h2>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Translation Tools</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 40px 20px;
+      background-color: #f0f2f5;
+      color: #333;
+      display: flex;
+      justify-content: center;
+    }
 
-<li><a href="split.html">split text</a></li>
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
 
-<h2>txt2epub (for a very specific txt)</h2>
+    h1 {
+      font-size: 24px;
+      color: #007BFF;
+      margin-bottom: 25px;
+      text-align: center;
+      border-bottom: 2px solid #eef2f6;
+      padding-bottom: 15px;
+      margin-top: 0;
+    }
 
-<li><a href="txt2epub.html">txt2epub</a></li>
+    .tool-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
 
-<h2>Web Novel Scraper and EPUB Generator</h2>
+    .tool-item {
+      margin-bottom: 20px;
+      padding: 18px;
+      border: 1px solid #eef2f6;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
 
-<li><a href="https://gist.github.com/tiklii/715c82d5dd06d701b4773c9eea65d4c5">wn-scraper.user.js</a></li>
+    .tool-item:hover {
+      border-color: #007BFF;
+      background-color: rgba(0, 123, 255, 0.02);
+      transform: translateY(-2px);
+    }
 
+    .tool-link {
+      font-size: 18px;
+      font-weight: 600;
+      color: #007BFF;
+      text-decoration: none;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .tool-link:hover {
+      color: #0056b3;
+    }
+
+    .tool-desc {
+      font-size: 14px;
+      color: #666;
+      margin: 0;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Web Novel Translation Tools</h1>
+    <ul class="tool-list">
+      <li class="tool-item">
+        <a class="tool-link" href="split.html">EPUB Text Chunker</a>
+        <p class="tool-desc">Splits large EPUB, TXT, or Markdown chapters into size-limited chunks to easily copy and
+          translate using ChatGPT or other LLMs.</p>
+      </li>
+      <li class="tool-item">
+        <a class="tool-link" href="txt2epub.html">TXT to EPUB Converter</a>
+        <p class="tool-desc">Converts .txt webnovel downloads offered on some chinese websites (sudugu.com) to epub.</p>
+      </li>
+      <li class="tool-item">
+        <a class="tool-link" href="https://gist.github.com/tiklii/715c82d5dd06d701b4773c9eea65d4c5" target="_blank"
+          rel="noopener noreferrer">Web Novel Scraper (Userscript)</a>
+        <p class="tool-desc">An AI-slop userscript designed to manually scrape chapters. Worked on booktoki.</p>
+      </li>
+    </ul>
+  </div>
+</body>
+
+</html>
