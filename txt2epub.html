@@ -208,9 +208,12 @@
 
       const reader = new FileReader();
 
-      reader.onload = function (event) {
+      reader.onload = async function (event) {
         const textContent = event.target.result;
         const chapters = textContent.split(/\n\s*\n/);
+
+        debugOutput.textContent = `Found ${chapters.length} chapters. Starting conversion...\n\n`;
+        debugOutput.scrollTop = debugOutput.scrollHeight;
 
         const zip = new JSZip();
         zip.file("mimetype", "application/epub+zip", {
@@ -233,9 +236,10 @@
         const spineItems = [];
         const tocEntries = [];
 
-        chapters.forEach((chapter, index) => {
+        for (let index = 0; index < chapters.length; index++) {
+          const chapter = chapters[index];
           const lines = chapter.trim().split("\n");
-          const chapterTitle = lines[0];
+          const chapterTitle = lines[0] || `Chapter ${index + 1}`;
           const chapterContent = lines.slice(1).join("\n");
           const chapterFileName = `chapter_${index + 1}.xhtml`;
 
@@ -263,7 +267,20 @@
               <content src="Text/${chapterFileName}"/>
             </navPoint>
           `);
-        });
+
+          // Append logs incrementally
+          debugOutput.textContent += `Processing Chapter ${index + 1}: ${chapterTitle}\n`;
+          debugOutput.scrollTop = debugOutput.scrollHeight;
+
+          // Yield execution thread periodically to prevent browser freeze and allow logs to render
+          if (index % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+        }
+
+        debugOutput.textContent += "\nGenerating EPUB file package...\n";
+        debugOutput.scrollTop = debugOutput.scrollHeight;
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         oebpsFolder.file("content.opf", `
           <?xml version="1.0" encoding="UTF-8"?>
@@ -300,40 +317,30 @@
           </ncx>
         `.trim());
 
-        // Generate EPUB as a ZIP file
         zip.generateAsync({
           type: "blob",
-          mimeType: "application/epub+zip" // Specify the correct MIME type
+          mimeType: "application/epub+zip"
         }).then(function (blob) {
-          // Attempt to force the .epub extension
           const downloadLink = document.createElement("a");
           downloadLink.href = URL.createObjectURL(blob);
-          downloadLink.download = `${fileName}.epub`; // Set the desired filename
+          downloadLink.download = `${fileName}.epub`;
 
-          document.body.appendChild(downloadLink); // Append to the document
-          downloadLink.click(); // Programmatically click the link
-          document.body.removeChild(downloadLink); // Remove from the document
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
 
-          // Append logs incrementally
-          debugOutput.textContent += "EPUB generated successfully.\n";
-          debugOutput.textContent += "Chapters:\n";
-          chapters.forEach((chapter, index) => {
-            debugOutput.textContent += `Chapter ${index + 1}: ${chapter.split("\n")[0]}\n`;
-          });
-
+          debugOutput.textContent += "\nEPUB generated successfully!\n";
+          debugOutput.scrollTop = debugOutput.scrollHeight;
         }).catch(err => {
-          debugOutput.textContent += "Error generating EPUB: " + err.message;
-          console.error("EPUB generation error:", err); // Log the error to the console for detailed debugging
+          debugOutput.textContent += "\nError generating EPUB: " + err.message + "\n";
+          debugOutput.scrollTop = debugOutput.scrollHeight;
+          console.error("EPUB generation error:", err);
         });
       };
 
       reader.readAsText(file);
     });
   </script>
-</body>
-
-</html>
-</script>
 </body>
 
 </html>
