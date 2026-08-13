@@ -128,6 +128,7 @@ async function loadFromHash() {
       currentChapterName = record.fileName.replace(/\.[^/.]+$/, "");
       const textArea = document.getElementById('chapterContent');
       textArea.value = originalText;
+      resetCopyChapterButton();
       formatText();
 
       // Reset scroll to top for TXT/MD loads
@@ -145,6 +146,16 @@ async function loadFromHash() {
   }
 }
 
+function resetCopyChapterButton() {
+  const copyBtn = document.getElementById('copyChapterButton');
+  if (copyBtn) {
+    copyBtn.classList.remove('green', 'dark-green');
+    const tick = copyBtn.querySelector('.tick');
+    if (tick) tick.style.display = 'none';
+    if (lastClickedButton === copyBtn) lastClickedButton = null;
+  }
+}
+
 async function loadChapterContent(href) {
   try {
     const chapterDoc = await book.load(href);
@@ -153,10 +164,7 @@ async function loadChapterContent(href) {
     const textArea = document.getElementById('chapterContent');
     textArea.value = originalText;
 
-    const copyBtn = document.getElementById('copyChapterButton');
-    copyBtn.classList.remove('green', 'dark-green');
-    copyBtn.querySelector('.tick').style.display = 'none';
-    if (lastClickedButton === copyBtn) lastClickedButton = null;
+    resetCopyChapterButton();
 
     formatText();
     updateCharCount();
@@ -492,6 +500,7 @@ document.getElementById('epubInput').addEventListener('change', async function(e
 
     document.getElementById('tocList').innerHTML = '';
     document.getElementById('chapterContent').value = '';
+    resetCopyChapterButton();
 
     updateHash(bookId, 0);
   } catch (error) {
