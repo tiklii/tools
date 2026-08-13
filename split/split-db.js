@@ -30,7 +30,7 @@ async function openDatabase() {
 
 async function storeFileInDB(file) {
   const db = await openDatabase();
-  const bookId = Math.floor(1000 + Math.random() * 9000).toString();
+  const bookId = Math.random().toString(36).substring(2, 8);
   const data = {
     bookId: bookId,
     fileName: file.name,
