@@ -194,7 +194,16 @@ text-align: right;
   user-select: none;
 }
 
-.input-container input[type="number"],
+.input-container input[type="number"] {
+  width: 140px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #dcdcdc;
+  border-radius: 4px;
+  font-size: 15px;
+}
+
 .input-container select {
   padding: 10px;
   border: 1px solid #dcdcdc;
