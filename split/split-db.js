@@ -357,8 +357,7 @@ function formatText() {
 function chunkText(ignoreExtras = false) {
   const text = document.getElementById('chapterContent').value;
   const maxChars = parseInt(document.getElementById('maxChars').value);
-  let addToTop = ignoreExtras ? "" : document.getElementById('addToTop').value.trim();
-  let addToBottom = ignoreExtras ? "" : document.getElementById('addToBottom').value.trim();
+  let chunkTemplate = ignoreExtras ? "" : (document.getElementById('chunkTemplate')?.value || "");
 
   const paragraphs = text.split('\n');
   const chunks = [];
@@ -383,9 +382,20 @@ function chunkText(ignoreExtras = false) {
   chunks.forEach((chunk, index) => {
     const partNumber = String(index + 1).padStart(digits, '0');
 
-    let topText = addToTop.replaceAll('$X', partNumber).replaceAll('$Y', chunks.length).replaceAll('$Z', cName);
-    let bottomText = addToBottom.replaceAll('$X', partNumber).replaceAll('$Y', chunks.length).replaceAll('$Z', cName);
-    let finalChunk = (topText + '\n\n' + chunk + '\n\n' + bottomText).trim();
+    let finalChunk = chunk;
+    if (chunkTemplate.trim()) {
+      finalChunk = chunkTemplate
+        .replaceAll('$PART_NO', partNumber)
+        .replaceAll('$TOTAL_PARTS', chunks.length)
+        .replaceAll('$CHAP_NAME', cName);
+
+      if (finalChunk.includes('$CONTENT')) {
+        finalChunk = finalChunk.replaceAll('$CONTENT', chunk);
+      } else {
+        finalChunk = `${finalChunk}\n\n${chunk}`;
+      }
+      finalChunk = finalChunk.trim();
+    }
 
     const div = document.createElement('div');
     div.className = 'chunk-container';
@@ -402,7 +412,21 @@ function chunkText(ignoreExtras = false) {
 
       chunkPressTimer = setTimeout(() => {
         isChunkLongPress = true;
-        let holdTranslatedText = `Translate to English (Part ${partNumber} of ${chunks.length}):\n\n${finalChunk}`;
+        let promptTemplate = document.getElementById('translatePrompt')?.value.trim();
+        if (!promptTemplate) {
+          promptTemplate = "Translate to English (Part $PART_NO of $TOTAL_PARTS):\n\n$CONTENT";
+        }
+        let holdTranslatedText = promptTemplate
+          .replaceAll('$PART_NO', partNumber)
+          .replaceAll('$TOTAL_PARTS', chunks.length)
+          .replaceAll('$CHAP_NAME', cName);
+
+        if (holdTranslatedText.includes('$CONTENT')) {
+          holdTranslatedText = holdTranslatedText.replaceAll('$CONTENT', chunk);
+        } else {
+          holdTranslatedText += `\n\n${chunk}`;
+        }
+
         copyToClipboard(holdTranslatedText);
         updateButtonState(copyBtn, true); // true = dark green
         if (navigator.vibrate) navigator.vibrate(50);
@@ -454,12 +478,40 @@ function updateButtonState(button, isDark = false) {
 document.addEventListener('DOMContentLoaded', async () => {
   await cleanupOldFiles();
 
-  ['maxChars', 'addToTop', 'addToBottom'].forEach(id => {
+  ['maxChars', 'chunkTemplate', 'translatePrompt'].forEach(id => {
     const el = document.getElementById(id);
+    if (!el) return;
     const saved = localStorage.getItem(id);
-    if (saved) el.value = saved;
+    if (saved !== null) el.value = saved;
     el.addEventListener('input', () => localStorage.setItem(id, el.value));
   });
+
+  const templateEl = document.getElementById('chunkTemplate');
+  if (templateEl && localStorage.getItem('chunkTemplate') === null) {
+    const savedTop = localStorage.getItem('addToTop') || '';
+    const savedBottom = localStorage.getItem('addToBottom') || '';
+    if (savedTop || savedBottom) {
+      const migrated = (savedTop + '\n\n$CONTENT\n\n' + savedBottom).trim();
+      templateEl.value = migrated;
+      localStorage.setItem('chunkTemplate', migrated);
+    }
+  }
+
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+  if (settingsBtn && settingsModal) {
+    settingsBtn.addEventListener('click', () => settingsModal.showModal());
+  }
+  if (closeSettingsBtn && settingsModal) {
+    closeSettingsBtn.addEventListener('click', () => settingsModal.close());
+  }
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) settingsModal.close();
+    });
+  }
 
   const formatSelect = document.getElementById('formatSelect');
   const savedFormat = localStorage.getItem('formatSelect');
