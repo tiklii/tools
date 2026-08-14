@@ -12,24 +12,47 @@ const epubStoreName = "epubs";
 
 // --- Database Logic ---
 
-async function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName, dbVersion);
-    request.onupgradeneeded = function(event) {
-      const db = event.target.result;
-      if (db.objectStoreNames.contains(epubStoreName)) {
-        db.deleteObjectStore(epubStoreName);
-      }
-      const store = db.createObjectStore(epubStoreName, { keyPath: "bookId" });
-      store.createIndex("lastAccessed", "lastAccessed", { unique: false });
-    };
-    request.onsuccess = (event) => resolve(event.target.result);
-    request.onerror = (event) => reject("DB Error: " + event.target.errorCode);
-  });
+let dbPromise = null;
+
+async function getDatabase() {
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(dbName, dbVersion);
+
+      request.onupgradeneeded = function(event) {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(epubStoreName)) {
+          const store = db.createObjectStore(epubStoreName, { keyPath: "bookId" });
+          store.createIndex("lastAccessed", "lastAccessed", { unique: false });
+        }
+      };
+
+      request.onsuccess = (event) => {
+        const db = event.target.result;
+
+        db.onclose = () => {
+          dbPromise = null;
+        };
+
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+
+        resolve(db);
+      };
+
+      request.onerror = (event) => {
+        dbPromise = null;
+        reject("DB Error: " + (event.target.error ? event.target.error.message : event.target.errorCode));
+      };
+    });
+  }
+  return dbPromise;
 }
 
 async function storeFileInDB(file) {
-  const db = await openDatabase();
+  const db = await getDatabase();
   const bookId = Math.random().toString(36).substring(2, 8);
   const data = {
     bookId: bookId,
@@ -47,7 +70,7 @@ async function storeFileInDB(file) {
 }
 
 async function getFileRecord(bookId) {
-  const db = await openDatabase();
+  const db = await getDatabase();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([epubStoreName], "readwrite");
     const store = transaction.objectStore(epubStoreName);
@@ -69,7 +92,7 @@ async function cleanupOldFiles() {
   const days = parseFloat(expiryVal);
   if (isNaN(days) || days <= 0) return;
 
-  const db = await openDatabase();
+  const db = await getDatabase();
   const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
 
   const transaction = db.transaction([epubStoreName], "readwrite");
