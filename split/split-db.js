@@ -105,6 +105,7 @@ async function loadFromHash() {
   }
 
   if (currentBookId !== bookId || !book) {
+    clearChunkedText();
     const record = await getFileRecord(bookId);
     if (!record) {
       console.error("Book not found in storage.");
@@ -128,6 +129,7 @@ async function loadFromHash() {
       currentChapterName = record.fileName.replace(/\.[^/.]+$/, "");
       const textArea = document.getElementById('chapterContent');
       textArea.value = originalText;
+      clearChunkedText();
       resetCopyChapterButton();
       formatText();
 
@@ -610,6 +612,7 @@ document.getElementById('epubInput').addEventListener('change', async function(e
 
     document.getElementById('tocList').innerHTML = '';
     document.getElementById('chapterContent').value = '';
+    clearChunkedText();
     resetCopyChapterButton();
 
     updateHash(bookId, 0);
@@ -619,3 +622,8 @@ document.getElementById('epubInput').addEventListener('change', async function(e
   }
   event.target.value = '';
 });
+
+function clearChunkedText() {
+  const container = document.getElementById('chunkedTextContainer');
+  if (container) container.innerHTML = '';
+}
