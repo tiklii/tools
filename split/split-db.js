@@ -64,9 +64,13 @@ async function getFileRecord(bookId) {
 }
 
 async function cleanupOldFiles() {
+  const expiryVal = localStorage.getItem('fileExpiry') || '15';
+  if (expiryVal === 'never') return;
+  const days = parseFloat(expiryVal);
+  if (isNaN(days) || days <= 0) return;
+
   const db = await openDatabase();
-  const fifteenDaysInMs = 15 * 24 * 60 * 60 * 1000;
-  const cutoff = Date.now() - fifteenDaysInMs;
+  const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
 
   const transaction = db.transaction([epubStoreName], "readwrite");
   const store = transaction.objectStore(epubStoreName);
@@ -76,7 +80,7 @@ async function cleanupOldFiles() {
   request.onsuccess = (event) => {
     const cursor = event.target.result;
     if (cursor) {
-      console.log("Deleting expired EPUB:", cursor.value.bookId);
+      console.log("Deleting expired file:", cursor.value.bookId);
       store.delete(cursor.primaryKey);
       cursor.continue();
     }
@@ -531,16 +535,25 @@ function renderQuickSplitButtons() {
 document.addEventListener('DOMContentLoaded', async () => {
   await cleanupOldFiles();
 
-  ['maxChars', 'chunkTemplate', 'translatePrompt', 'quickSplitPresets'].forEach(id => {
+  ['maxChars', 'chunkTemplate', 'translatePrompt', 'quickSplitPresets', 'fileExpiry'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const saved = localStorage.getItem(id);
     if (saved !== null) el.value = saved;
-    el.addEventListener('input', () => {
+    const saveAndApply = () => {
       localStorage.setItem(id, el.value);
       if (id === 'quickSplitPresets') renderQuickSplitButtons();
-    });
+      if (id === 'fileExpiry') cleanupOldFiles();
+    };
+    el.addEventListener('input', saveAndApply);
+    el.addEventListener('change', saveAndApply);
   });
+
+  const fileExpiryEl = document.getElementById('fileExpiry');
+  if (fileExpiryEl && localStorage.getItem('fileExpiry') === null) {
+    fileExpiryEl.value = '15';
+    localStorage.setItem('fileExpiry', '15');
+  }
 
   const presetsEl = document.getElementById('quickSplitPresets');
   if (presetsEl && localStorage.getItem('quickSplitPresets') === null) {

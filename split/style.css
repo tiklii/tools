@@ -203,6 +203,7 @@ text-align: right;
 }
 
 .input-container input[type="text"],
+.modal-body .input-container select,
 .input-container textarea {
   width: 100%;
   box-sizing: border-box;
