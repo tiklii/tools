@@ -101,6 +101,7 @@ async function loadFromHash() {
   const { bookId, spineIndex } = getHashState();
   if (!bookId) {
     document.title = "EPUB Text Chunker";
+    updateFormatSelectVisibility(false);
     return;
   }
 
@@ -111,6 +112,7 @@ async function loadFromHash() {
       console.error("Book not found in storage.");
       document.getElementById('fileNameDisplay').textContent = "File missing or expired";
       document.title = "EPUB Text Chunker";
+      updateFormatSelectVisibility(false);
       return;
     }
 
@@ -121,10 +123,12 @@ async function loadFromHash() {
     document.title = record.fileName + " - Split";
 
     if (record.fileName.endsWith('.epub')) {
+      updateFormatSelectVisibility(true);
       book = ePub(record.blob);
       const navigation = await book.loaded.navigation;
       renderToc(navigation.toc, bookId);
     } else {
+      updateFormatSelectVisibility(false);
       originalText = await record.blob.text();
       currentChapterName = record.fileName.replace(/\.[^/.]+$/, "");
       const textArea = document.getElementById('chapterContent');
@@ -576,6 +580,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const formatSelect = document.getElementById('formatSelect');
   const savedFormat = localStorage.getItem('formatSelect');
   formatSelect.value = savedFormat ? savedFormat : 'clean';
+  updateFormatSelectVisibility(false);
   formatSelect.addEventListener('change', () => {
     localStorage.setItem('formatSelect', formatSelect.value);
     formatText();
@@ -626,4 +631,26 @@ document.getElementById('epubInput').addEventListener('change', async function(e
 function clearChunkedText() {
   const container = document.getElementById('chunkedTextContainer');
   if (container) container.innerHTML = '';
+}
+
+function updateFormatSelectVisibility(isEpub) {
+  const formatSelect = document.getElementById('formatSelect');
+  if (!formatSelect) return;
+  const prettifyOption = formatSelect.querySelector('option[value="prettify-html"]');
+  if (!prettifyOption) return;
+
+  if (isEpub) {
+    prettifyOption.hidden = false;
+    prettifyOption.disabled = false;
+    prettifyOption.style.display = '';
+  } else {
+    prettifyOption.hidden = true;
+    prettifyOption.disabled = true;
+    prettifyOption.style.display = 'none';
+    if (formatSelect.value === 'prettify-html') {
+      formatSelect.value = 'clean';
+      localStorage.setItem('formatSelect', 'clean');
+      formatText();
+    }
+  }
 }
