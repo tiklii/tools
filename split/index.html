@@ -34,7 +34,7 @@
 
   <div class="input-container">
     <label for="maxChars">Max characters per chunk:</label>
-    <input type="number" id="maxChars" value="1800">
+    <input type="number" id="maxChars" value="4700">
   </div>
 
   <div class="input-container">
@@ -46,7 +46,10 @@
     </select>
   </div>
 
-  <button id="splitButton">Split Text</button>
+  <div class="split-button-container">
+    <button id="splitButton" class="split-btn-primary">Split Text</button>
+    <div id="quickSplitButtons" class="quick-split-buttons"></div>
+  </div>
 
   <dialog id="settingsModal" class="settings-modal">
     <div class="modal-header">
@@ -54,6 +57,11 @@
       <button id="closeSettingsBtn" class="close-button" aria-label="Close Settings">&times;</button>
     </div>
     <div class="modal-body">
+      <div class="input-container">
+        <label for="quickSplitPresets">Quick Split Presets (comma-separated):</label>
+        <input type="text" id="quickSplitPresets" placeholder="1800, 4700">
+      </div>
+
       <div class="input-container">
         <label for="chunkTemplate">Chunk Template:</label>
         <textarea id="chunkTemplate" rows="5"

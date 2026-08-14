@@ -354,9 +354,12 @@ function formatText() {
 
 // --- Chunking Logic ---
 
-function chunkText(ignoreExtras = false) {
+function chunkText(ignoreExtras = false, customMaxChars = null) {
   const text = document.getElementById('chapterContent').value;
-  const maxChars = parseInt(document.getElementById('maxChars').value);
+  const maxCharsInput = document.getElementById('maxChars');
+  const maxChars = (customMaxChars !== null && customMaxChars !== undefined)
+    ? customMaxChars
+    : (parseInt(maxCharsInput.value) || 4700);
   let chunkTemplate = ignoreExtras ? "" : (document.getElementById('chunkTemplate')?.value || "");
 
   const paragraphs = text.split('\n');
@@ -473,18 +476,73 @@ function updateButtonState(button, isDark = false) {
   lastClickedButton = button;
 }
 
+function renderQuickSplitButtons() {
+  const container = document.getElementById('quickSplitButtons');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const presetsInput = document.getElementById('quickSplitPresets');
+  const rawVal = presetsInput && presetsInput.value.trim() !== '' ? presetsInput.value : '1800, 4700';
+  const presets = rawVal
+    .split(',')
+    .map(s => parseInt(s.trim()))
+    .filter(n => !isNaN(n) && n > 0);
+
+  presets.forEach(num => {
+    const btn = document.createElement('button');
+    btn.className = 'quick-split-btn';
+    btn.textContent = num;
+    btn.title = `Split text with max ${num} characters`;
+
+    let pressTimer, isLongPress = false;
+    btn.addEventListener('pointerdown', function(e) {
+      if (e.button !== 0 && e.type !== 'touchstart') return;
+      isLongPress = false;
+      pressTimer = setTimeout(() => {
+        isLongPress = true;
+        chunkText(true, num);
+        if (navigator.vibrate) navigator.vibrate(50);
+      }, 600);
+    });
+
+    btn.addEventListener('pointerup', () => clearTimeout(pressTimer));
+    btn.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+    btn.addEventListener('pointercancel', () => clearTimeout(pressTimer));
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    btn.addEventListener('click', function() {
+      if (!isLongPress) {
+        chunkText(false, num);
+      }
+    });
+
+    container.appendChild(btn);
+  });
+}
+
 // --- Event Listeners ---
 
 document.addEventListener('DOMContentLoaded', async () => {
   await cleanupOldFiles();
 
-  ['maxChars', 'chunkTemplate', 'translatePrompt'].forEach(id => {
+  ['maxChars', 'chunkTemplate', 'translatePrompt', 'quickSplitPresets'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const saved = localStorage.getItem(id);
     if (saved !== null) el.value = saved;
-    el.addEventListener('input', () => localStorage.setItem(id, el.value));
+    el.addEventListener('input', () => {
+      localStorage.setItem(id, el.value);
+      if (id === 'quickSplitPresets') renderQuickSplitButtons();
+    });
   });
+
+  const presetsEl = document.getElementById('quickSplitPresets');
+  if (presetsEl && localStorage.getItem('quickSplitPresets') === null) {
+    presetsEl.value = '1800, 4700';
+    localStorage.setItem('quickSplitPresets', '1800, 4700');
+  }
+
+  renderQuickSplitButtons();
 
   const templateEl = document.getElementById('chunkTemplate');
   if (templateEl && localStorage.getItem('chunkTemplate') === null) {
