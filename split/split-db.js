@@ -133,6 +133,10 @@ async function loadFromHash() {
   }
 
   if (currentBookId !== bookId || !book) {
+    if (book && typeof book.destroy === 'function') {
+      book.destroy();
+      book = null;
+    }
     clearChunkedText();
     const record = await getFileRecord(bookId);
     if (!record) {
@@ -155,6 +159,7 @@ async function loadFromHash() {
       const navigation = await book.loaded.navigation;
       renderToc(navigation.toc, bookId);
     } else {
+      book = null;
       updateFormatSelectVisibility(false);
       originalText = await record.blob.text();
       currentChapterName = record.fileName.replace(/\.[^/.]+$/, "");
